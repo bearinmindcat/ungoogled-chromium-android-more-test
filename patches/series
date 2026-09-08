@@ -96,3 +96,6 @@ Bromite/Add-an-always-incognito-mode.patch
 Cromite/Add-bookmark-import-export-actions.patch
 
 #Other/debug-fix.patch
+ungoogled-chromium-android/Enables-keyword-based-site-search-on-Android-devices.patch
+ungoogled-chromium-android/Add-more-search-engines-updated.patch
+Cromite/OpenSearch-miscellaneous.patch
