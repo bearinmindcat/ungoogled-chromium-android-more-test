@@ -1,0 +1,103 @@
+--- a/chrome/android/java/src/org/chromium/chrome/browser/accessibility/settings/ChromeAccessibilitySettingsDelegate.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/accessibility/settings/ChromeAccessibilitySettingsDelegate.java
+@@ -4,14 +4,22 @@
+ 
+ package org.chromium.chrome.browser.accessibility.settings;
+ 
++import android.app.Activity;
++
+ import org.chromium.build.annotations.NullMarked;
++import org.chromium.build.annotations.Nullable;
++import org.chromium.chrome.R;
+ import org.chromium.chrome.browser.dom_distiller.DomDistillerServiceFactory;
++import org.chromium.chrome.browser.lifetime.ApplicationLifetime;
+ import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+ import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
+ import org.chromium.chrome.browser.image_descriptions.ImageDescriptionsController;
+ import org.chromium.chrome.browser.preferences.Pref;
+ import org.chromium.chrome.browser.profiles.Profile;
+ import org.chromium.chrome.browser.settings.SettingsNavigationFactory;
++import org.chromium.chrome.browser.ui.messages.snackbar.Snackbar;
++import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
++import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager.SnackbarManageable;
+ import org.chromium.components.browser_ui.accessibility.AccessibilitySettingsDelegate;
+ import org.chromium.components.browser_ui.settings.SettingsNavigation;
+ import org.chromium.components.dom_distiller.core.DistilledPagePrefs;
+@@ -82,6 +90,27 @@ public class ChromeAccessibilitySettings
+         return new ForceTabletUIDelegate();
+     }
+ 
++    @Override
++    public void requestRestart(@Nullable Activity activity) {
++        if (!(activity instanceof SnackbarManageable)) return;
++        SnackbarManager manager = ((SnackbarManageable) activity).getSnackbarManager();
++        if (manager.isShowing()) return;
++        Snackbar snackbar =
++                Snackbar.make(
++                                activity.getString(R.string.ui_relaunch_notice),
++                                new SnackbarManager.SnackbarController() {
++                                    @Override
++                                    public void onAction(@Nullable Object actionData) {
++                                        ApplicationLifetime.terminate(true);
++                                    }
++                                },
++                                Snackbar.TYPE_NOTIFICATION,
++                                Snackbar.UMA_UNKNOWN)
++                        .setAction(activity.getString(R.string.relaunch), null)
++                        .setDuration(70000);
++        manager.showSnackbar(snackbar);
++    }
++
+     private final Profile mProfile;
+ 
+     /**
+--- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
++++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
+@@ -632,6 +632,12 @@ For more settings that use data to impro
+       <message name="IDS_FORCE_TABLET_UI_TITLE" desc="Title of the preference that allows the user to update force tablet UI settings.">
+         Force Tablet Mode
+       </message>
++      <message name="IDS_RELAUNCH" desc="Text of the button that relaunches the browser so a pending setting can take effect.">
++        Relaunch
++      </message>
++      <message name="IDS_UI_RELAUNCH_NOTICE" desc="Message telling the user that a setting they just changed only takes effect after the browser is relaunched.">
++        Your changes will take effect the next time you relaunch chromium.
++      </message>
+ 
+       <!-- Add Message -->
+ 
+--- a/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettings.java
++++ b/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettings.java
+@@ -297,7 +297,7 @@ public class AccessibilitySettings exten
+             mDelegate.getForceEnableZoomAccessibilityDelegate().setValue((Boolean) newValue);
+         } else if (PREF_FORCE_TABLET_UI.equals(preference.getKey())) {
+             mForceTabletUIDelegate.setValue((Boolean) newValue);
+-            // Force-tablet takes effect on next app launch (no immediate restart at 150).
++            mDelegate.requestRestart(getActivity());
+         } else if (PREF_READER_FOR_ACCESSIBILITY.equals(preference.getKey())) {
+             boolean readerModeEnabled = (Boolean) newValue;
+             mDelegate.getReaderAccessibilityDelegate().setValue(readerModeEnabled);
+--- a/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettingsDelegate.java
++++ b/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettingsDelegate.java
+@@ -4,6 +4,8 @@
+ 
+ package org.chromium.components.browser_ui.accessibility;
+ 
++import android.app.Activity;
++
+ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.build.annotations.Nullable;
+ import org.chromium.components.browser_ui.settings.SettingsNavigation;
+@@ -46,6 +48,12 @@ public interface AccessibilitySettingsDe
+     BooleanPreferenceDelegate getForceTabletUIDelegate();
+ 
+     /**
++     * Invites the user to relaunch the browser so a setting that is only read during startup can
++     * take effect. Embedders that cannot show the invitation may leave this as a no-op.
++     */
++    default void requestRestart(@Nullable Activity activity) {}
++
++    /**
+      * @return boolean value specifying if the Image Descriptions user setting should be shown.
+      */
+     boolean shouldShowImageDescriptionsSetting();
