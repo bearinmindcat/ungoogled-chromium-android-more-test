@@ -100,3 +100,4 @@ ungoogled-chromium-android/Enables-keyword-based-site-search-on-Android-devices.
 ungoogled-chromium-android/Add-more-search-engines-updated.patch
 Cromite/OpenSearch-miscellaneous.patch
 Other/Move-enable-tabs-toggle-to-main-settings.patch
+Other/Change-package-name-more.patch
