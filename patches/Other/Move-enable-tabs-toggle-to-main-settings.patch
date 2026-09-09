@@ -1,0 +1,231 @@
+--- a/chrome/android/java/res/xml/main_preferences.xml
++++ b/chrome/android/java/res/xml/main_preferences.xml
+@@ -142,5 +142,14 @@ found in the LICENSE file.
+         android:key="about_chrome"
+         android:order="31"
+         android:title="@string/prefs_about_chrome"/>
++    <PreferenceCategory
++        android:key="experimental_section"
++        android:order="32"
++        android:title="@string/experimental_section_title"/>
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:key="enable_tabs_switch"
++        android:order="33"
++        android:summary="@string/enable_tabs_summary"
++        android:title="@string/enable_tabs_title"/>
+ 
+ </PreferenceScreen>
+--- a/chrome/android/java/src/org/chromium/chrome/browser/accessibility/settings/ChromeAccessibilitySettingsDelegate.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/accessibility/settings/ChromeAccessibilitySettingsDelegate.java
+@@ -6,8 +6,6 @@ package org.chromium.chrome.browser.acce
+ 
+ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.chrome.browser.dom_distiller.DomDistillerServiceFactory;
+-import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+-import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
+ import org.chromium.chrome.browser.image_descriptions.ImageDescriptionsController;
+ import org.chromium.chrome.browser.preferences.Pref;
+ import org.chromium.chrome.browser.profiles.Profile;
+@@ -63,25 +61,6 @@ public class ChromeAccessibilitySettings
+         }
+     }
+ 
+-    private static class ForceTabletUIDelegate implements BooleanPreferenceDelegate {
+-        @Override
+-        public boolean getValue() {
+-            return ChromeSharedPreferences.getInstance().readBoolean(
+-                      ChromePreferenceKeys.FLAGS_FORCE_TABLET_UI_ENABLED, false);
+-        }
+-
+-        @Override
+-        public void setValue(boolean value) {
+-            ChromeSharedPreferences.getInstance().writeBoolean(
+-                      ChromePreferenceKeys.FLAGS_FORCE_TABLET_UI_ENABLED, value);
+-        }
+-    }
+-
+-    @Override
+-    public BooleanPreferenceDelegate getForceTabletUIDelegate() {
+-        return new ForceTabletUIDelegate();
+-    }
+-
+     private final Profile mProfile;
+ 
+     /**
+--- a/chrome/android/java/src/org/chromium/chrome/browser/settings/MainSettings.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/MainSettings.java
+@@ -55,6 +55,7 @@ import org.chromium.chrome.browser.passw
+ import org.chromium.chrome.browser.password_manager.PasswordManagerHelper;
+ import org.chromium.chrome.browser.password_manager.PasswordManagerLauncher;
+ import org.chromium.chrome.browser.password_manager.settings.PasswordsPreference;
++import org.chromium.chrome.browser.lifetime.ApplicationLifetime;
+ import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+ import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
+ import org.chromium.chrome.browser.preferences.Pref;
+@@ -73,12 +74,14 @@ import org.chromium.chrome.browser.toolb
+ import org.chromium.chrome.browser.toolbar.settings.AddressBarSettingsFragment;
+ import org.chromium.chrome.browser.tracing.settings.DeveloperSettings;
+ import org.chromium.chrome.browser.ui.default_browser_promo.DefaultBrowserPromoUtils;
++import org.chromium.chrome.browser.ui.messages.snackbar.Snackbar;
+ import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
+ import org.chromium.chrome.browser.ui.settings_promo_card.SettingsPromoCardPreference;
+ import org.chromium.chrome.browser.ui.signin.BottomSheetSigninAndHistorySyncCoordinator;
+ import org.chromium.chrome.browser.ui.signin.SignOutCoordinator;
+ import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+ import org.chromium.components.browser_ui.settings.ChromeBasePreference;
++import org.chromium.components.browser_ui.settings.ChromeSwitchPreference;
+ import org.chromium.components.browser_ui.settings.ManagedPreferenceDelegate;
+ import org.chromium.components.browser_ui.settings.SettingsCustomTabLauncher;
+ import org.chromium.components.browser_ui.settings.SettingsUtils;
+@@ -117,6 +120,7 @@ public class MainSettings extends Chrome
+                 SigninManager.SignInStateObserver,
+                 SettingsCustomTabLauncher.SettingsCustomTabLauncherClient {
+     public static final String PREF_SETTINGS_PROMO_CARD = "settings_promo_card";
++    public static final String PREF_ENABLE_TABS = "enable_tabs_switch";
+     public static final String PREF_ACCOUNT_AND_GOOGLE_SERVICES_SECTION =
+             "account_and_google_services_section";
+     public static final String PREF_SIGN_IN = "sign_in";
+@@ -354,6 +358,8 @@ public class MainSettings extends Chrome
+ 
+         SettingsUtils.addPreferencesFromResource(this, R.xml.main_preferences);
+ 
++        configureEnableTabsSwitch();
++
+         IdentityManager identityManager =
+                 IdentityServicesProvider.get().getIdentityManager(getProfile());
+         assert identityManager != null;
+@@ -543,6 +549,42 @@ public class MainSettings extends Chrome
+         }
+     }
+ 
++    private void configureEnableTabsSwitch() {
++        ChromeSwitchPreference enableTabsSwitch = findPreference(PREF_ENABLE_TABS);
++        if (enableTabsSwitch == null) return;
++        enableTabsSwitch.setChecked(
++                ChromeSharedPreferences.getInstance()
++                        .readBoolean(ChromePreferenceKeys.FLAGS_FORCE_TABLET_UI_ENABLED, false));
++        enableTabsSwitch.setOnPreferenceChangeListener(
++                (preference, newValue) -> {
++                    ChromeSharedPreferences.getInstance()
++                            .writeBoolean(
++                                    ChromePreferenceKeys.FLAGS_FORCE_TABLET_UI_ENABLED,
++                                    (boolean) newValue);
++                    showRelaunchSnackbar();
++                    return true;
++                });
++    }
++
++    private void showRelaunchSnackbar() {
++        SnackbarManager manager = SupplierUtils.asNonNull(mSnackbarManagerSupplier).get();
++        if (manager == null || manager.isShowing()) return;
++        Snackbar snackbar =
++                Snackbar.make(
++                                getString(R.string.ui_relaunch_notice),
++                                new SnackbarManager.SnackbarController() {
++                                    @Override
++                                    public void onAction(@Nullable Object actionData) {
++                                        ApplicationLifetime.terminate(true);
++                                    }
++                                },
++                                Snackbar.TYPE_NOTIFICATION,
++                                Snackbar.UMA_UNKNOWN)
++                        .setAction(getString(R.string.relaunch), null)
++                        .setDuration(70000);
++        manager.showSnackbar(snackbar);
++    }
++
+     private void updatePreferences() {
+         // Avoids using large numbers of dependencies to simplify testing / mocking.
+         if (mSkipUpdatePreferencesForTesting) {
+--- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
++++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
+@@ -632,6 +632,21 @@ For more settings that use data to impro
+       <message name="IDS_FORCE_TABLET_UI_TITLE" desc="Title of the preference that allows the user to update force tablet UI settings.">
+         Force Tablet Mode
+       </message>
++      <message name="IDS_EXPERIMENTAL_SECTION_TITLE" desc="Header of the settings section that holds experimental options.">
++        Experimental
++      </message>
++      <message name="IDS_ENABLE_TABS_TITLE" desc="Title of the preference that shows open tabs in a row above the address bar.">
++        Enable tabs
++      </message>
++      <message name="IDS_ENABLE_TABS_SUMMARY" desc="Summary of the preference that shows open tabs in a row above the address bar.">
++        Show open tabs in a row above the address bar
++      </message>
++      <message name="IDS_RELAUNCH" desc="Text of the button that relaunches the browser so a pending setting can take effect.">
++        Relaunch
++      </message>
++      <message name="IDS_UI_RELAUNCH_NOTICE" desc="Message telling the user that a setting they just changed only takes effect after the browser is relaunched.">
++        Your changes will take effect the next time you relaunch chromium.
++      </message>
+ 
+       <!-- Add Message -->
+ 
+--- a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
++++ b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
+@@ -45,11 +45,6 @@ found in the LICENSE file.
+         android:summary="@string/caret_browsing_summary"
+         android:title="@string/caret_browsing_title" />
+ 
+-    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
+-        android:key="force_tablet_ui"
+-        android:summary="@string/force_tablet_ui_summary"
+-        android:title="@string/force_tablet_ui_title" />
+-
+     <Preference
+         android:key="captions"
+         android:title="@string/accessibility_captions_title"/>
+--- a/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettings.java
++++ b/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettings.java
+@@ -42,7 +42,6 @@ import org.chromium.components.prefs.Pre
+ import org.chromium.components.prefs.PrefChangeRegistrar.PrefObserver;
+ import org.chromium.components.user_prefs.UserPrefs;
+ import org.chromium.content_public.browser.ContentFeatureList;
+-import org.chromium.components.browser_ui.accessibility.AccessibilitySettingsDelegate.BooleanPreferenceDelegate;
+ import org.chromium.content_public.browser.ContentFeatureMap;
+ import org.chromium.ui.base.UiAndroidFeatureList;
+ 
+@@ -86,9 +85,6 @@ public class AccessibilitySettings exten
+                 }
+             };
+ 
+-    private BooleanPreferenceDelegate mForceTabletUIDelegate;
+-    static final String PREF_FORCE_TABLET_UI = "force_tablet_ui";
+-
+     private PageZoomPreference mPageZoomDefaultZoomPref;
+     private ChromeSwitchPreference mPageZoomIncludeOSAdjustment;
+     private ChromeSwitchPreference mPageZoomAlwaysShowPref;
+@@ -174,12 +170,6 @@ public class AccessibilitySettings exten
+             readerEnableLinks.setOnPreferenceChangeListener(this);
+         }
+ 
+-        ChromeSwitchPreference forceTabletUiPref =
+-                (ChromeSwitchPreference) findPreference(PREF_FORCE_TABLET_UI);
+-        mForceTabletUIDelegate = mDelegate.getForceTabletUIDelegate();
+-        forceTabletUiPref.setChecked(mForceTabletUIDelegate.getValue());
+-        forceTabletUiPref.setOnPreferenceChangeListener(this);
+-
+         Preference captions = findPreference(PREF_CAPTIONS);
+         captions.setOnPreferenceClickListener(
+                 preference -> {
+@@ -295,9 +285,6 @@ public class AccessibilitySettings exten
+         assertNonNull(mDelegate);
+         if (PREF_FORCE_ENABLE_ZOOM.equals(preference.getKey())) {
+             mDelegate.getForceEnableZoomAccessibilityDelegate().setValue((Boolean) newValue);
+-        } else if (PREF_FORCE_TABLET_UI.equals(preference.getKey())) {
+-            mForceTabletUIDelegate.setValue((Boolean) newValue);
+-            // Force-tablet takes effect on next app launch (no immediate restart at 150).
+         } else if (PREF_READER_FOR_ACCESSIBILITY.equals(preference.getKey())) {
+             boolean readerModeEnabled = (Boolean) newValue;
+             mDelegate.getReaderAccessibilityDelegate().setValue(readerModeEnabled);
+--- a/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettingsDelegate.java
++++ b/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettingsDelegate.java
+@@ -43,8 +43,6 @@ public interface AccessibilitySettingsDe
+      */
+     BrowserContextHandle getBrowserContextHandle();
+ 
+-    BooleanPreferenceDelegate getForceTabletUIDelegate();
+-
+     /**
+      * @return boolean value specifying if the Image Descriptions user setting should be shown.
+      */

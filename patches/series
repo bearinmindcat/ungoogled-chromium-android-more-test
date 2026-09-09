@@ -99,4 +99,4 @@ Cromite/Add-bookmark-import-export-actions.patch
 ungoogled-chromium-android/Enables-keyword-based-site-search-on-Android-devices.patch
 ungoogled-chromium-android/Add-more-search-engines-updated.patch
 Cromite/OpenSearch-miscellaneous.patch
-Cromite/Add-relaunch-prompt-for-force-tablet-UI.patch
+Other/Move-enable-tabs-toggle-to-main-settings.patch
