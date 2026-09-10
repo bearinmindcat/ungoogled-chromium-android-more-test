@@ -1,3 +1,50 @@
+--- a/chrome/android/chrome_java_resources.gni
++++ b/chrome/android/chrome_java_resources.gni
+@@ -655,6 +655,7 @@ chrome_java_resources = [
+   "java/res/xml/google_services_preferences.xml",
+   "java/res/xml/homepage_preferences.xml",
+   "java/res/xml/legal_information_preferences.xml",
++  "java/res/xml/experimental_tabs_preferences.xml",
+   "java/res/xml/main_preferences.xml",
+   "java/res/xml/personalize_google_services_preferences.xml",
+   "java/res/xml/privacy_preferences.xml",
+--- a/chrome/android/chrome_java_sources.gni
++++ b/chrome/android/chrome_java_sources.gni
+@@ -1064,6 +1064,7 @@ chrome_java_sources = [
+   "java/src/org/chromium/chrome/browser/services/gcm/GCMBackgroundServiceImpl.java",
+   "java/src/org/chromium/chrome/browser/services/gcm/GCMNativeBackgroundTask.java",
+   "java/src/org/chromium/chrome/browser/services/gcm/GcmUma.java",
++  "java/src/org/chromium/chrome/browser/settings/ExperimentalTabsSettings.java",
+   "java/src/org/chromium/chrome/browser/settings/FragmentDependencyProvider.java",
+   "java/src/org/chromium/chrome/browser/settings/SettingsContainmentHelper.java",
+ 
+--- /dev/null
++++ b/chrome/android/java/res/xml/experimental_tabs_preferences.xml
+@@ -0,0 +1,24 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++Copyright 2026 The Chromium Authors
++Use of this source code is governed by a BSD-style license that can be
++found in the LICENSE file.
++-->
++
++<PreferenceScreen
++    xmlns:android="http://schemas.android.com/apk/res/android">
++
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:key="enable_tabs_switch"
++        android:title="@string/enable_tabs_title"/>
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:key="floating_tabs_switch"
++        android:title="@string/floating_tabs_title"/>
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:key="background_tab_close_switch"
++        android:title="@string/background_tab_close_title"/>
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:dependency="floating_tabs_switch"
++        android:key="dark_tab_strip_switch"
++        android:title="@string/dark_tab_strip_title"/>
++</PreferenceScreen>
 --- a/chrome/android/java/res/xml/main_preferences.xml
 +++ b/chrome/android/java/res/xml/main_preferences.xml
 @@ -142,5 +142,14 @@ found in the LICENSE file.
@@ -8,11 +55,11 @@
 +        android:key="experimental_section"
 +        android:order="32"
 +        android:title="@string/experimental_section_title"/>
-+    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
-+        android:key="enable_tabs_switch"
++    <Preference
++        android:fragment="org.chromium.chrome.browser.settings.ExperimentalTabsSettings"
++        android:key="experimental_tabs"
 +        android:order="33"
-+        android:summary="@string/enable_tabs_summary"
-+        android:title="@string/enable_tabs_title"/>
++        android:title="@string/experimental_tabs_title"/>
  
  </PreferenceScreen>
 --- a/chrome/android/java/src/org/chromium/chrome/browser/accessibility/settings/ChromeAccessibilitySettingsDelegate.java
@@ -52,75 +99,86 @@
      private final Profile mProfile;
  
      /**
---- a/chrome/android/java/src/org/chromium/chrome/browser/settings/MainSettings.java
-+++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/MainSettings.java
-@@ -55,6 +55,7 @@ import org.chromium.chrome.browser.passw
- import org.chromium.chrome.browser.password_manager.PasswordManagerHelper;
- import org.chromium.chrome.browser.password_manager.PasswordManagerLauncher;
- import org.chromium.chrome.browser.password_manager.settings.PasswordsPreference;
-+import org.chromium.chrome.browser.lifetime.ApplicationLifetime;
- import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
- import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
- import org.chromium.chrome.browser.preferences.Pref;
-@@ -73,12 +74,14 @@ import org.chromium.chrome.browser.toolb
- import org.chromium.chrome.browser.toolbar.settings.AddressBarSettingsFragment;
- import org.chromium.chrome.browser.tracing.settings.DeveloperSettings;
- import org.chromium.chrome.browser.ui.default_browser_promo.DefaultBrowserPromoUtils;
-+import org.chromium.chrome.browser.ui.messages.snackbar.Snackbar;
- import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
- import org.chromium.chrome.browser.ui.settings_promo_card.SettingsPromoCardPreference;
- import org.chromium.chrome.browser.ui.signin.BottomSheetSigninAndHistorySyncCoordinator;
- import org.chromium.chrome.browser.ui.signin.SignOutCoordinator;
- import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
- import org.chromium.components.browser_ui.settings.ChromeBasePreference;
-+import org.chromium.components.browser_ui.settings.ChromeSwitchPreference;
- import org.chromium.components.browser_ui.settings.ManagedPreferenceDelegate;
- import org.chromium.components.browser_ui.settings.SettingsCustomTabLauncher;
- import org.chromium.components.browser_ui.settings.SettingsUtils;
-@@ -117,6 +120,7 @@ public class MainSettings extends Chrome
-                 SigninManager.SignInStateObserver,
-                 SettingsCustomTabLauncher.SettingsCustomTabLauncherClient {
-     public static final String PREF_SETTINGS_PROMO_CARD = "settings_promo_card";
-+    public static final String PREF_ENABLE_TABS = "enable_tabs_switch";
-     public static final String PREF_ACCOUNT_AND_GOOGLE_SERVICES_SECTION =
-             "account_and_google_services_section";
-     public static final String PREF_SIGN_IN = "sign_in";
-@@ -354,6 +358,8 @@ public class MainSettings extends Chrome
- 
-         SettingsUtils.addPreferencesFromResource(this, R.xml.main_preferences);
- 
-+        configureEnableTabsSwitch();
+--- /dev/null
++++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/ExperimentalTabsSettings.java
+@@ -0,0 +1,100 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
 +
-         IdentityManager identityManager =
-                 IdentityServicesProvider.get().getIdentityManager(getProfile());
-         assert identityManager != null;
-@@ -543,6 +549,42 @@ public class MainSettings extends Chrome
-         }
-     }
- 
-+    private void configureEnableTabsSwitch() {
-+        ChromeSwitchPreference enableTabsSwitch = findPreference(PREF_ENABLE_TABS);
-+        if (enableTabsSwitch == null) return;
-+        enableTabsSwitch.setChecked(
-+                ChromeSharedPreferences.getInstance()
-+                        .readBoolean(ChromePreferenceKeys.FLAGS_FORCE_TABLET_UI_ENABLED, false));
-+        enableTabsSwitch.setOnPreferenceChangeListener(
++package org.chromium.chrome.browser.settings;
++
++import android.app.Activity;
++import android.os.Bundle;
++
++import org.chromium.base.supplier.MonotonicObservableSupplier;
++import org.chromium.base.supplier.ObservableSuppliers;
++import org.chromium.base.supplier.SettableMonotonicObservableSupplier;
++import org.chromium.build.annotations.NullMarked;
++import org.chromium.build.annotations.Nullable;
++import org.chromium.chrome.R;
++import org.chromium.chrome.browser.lifetime.ApplicationLifetime;
++import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
++import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
++import org.chromium.chrome.browser.ui.messages.snackbar.Snackbar;
++import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
++import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager.SnackbarManageable;
++import org.chromium.components.browser_ui.settings.ChromeSwitchPreference;
++import org.chromium.components.browser_ui.settings.EmbeddableSettingsPage;
++import org.chromium.components.browser_ui.settings.SettingsUtils;
++
++/** Tab strip appearance options, reached from Settings > Experimental > Tabs. */
++@NullMarked
++public class ExperimentalTabsSettings extends ChromeBaseSettingsFragment
++        implements EmbeddableSettingsPage {
++    static final String PREF_ENABLE_TABS = "enable_tabs_switch";
++    static final String PREF_FLOATING_TABS = "floating_tabs_switch";
++    static final String PREF_BACKGROUND_TAB_CLOSE = "background_tab_close_switch";
++    static final String PREF_DARK_TAB_STRIP = "dark_tab_strip_switch";
++
++    private final SettableMonotonicObservableSupplier<String> mPageTitle =
++            ObservableSuppliers.createMonotonic();
++
++    @Override
++    public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
++        SettingsUtils.addPreferencesFromResource(this, R.xml.experimental_tabs_preferences);
++        mPageTitle.set(getString(R.string.experimental_tabs_title));
++
++        // Read at startup only, so it needs a relaunch to take effect.
++        bind(PREF_ENABLE_TABS, ChromePreferenceKeys.FLAGS_FORCE_TABLET_UI_ENABLED, false, true);
++        // Read while the strip draws, so these apply to the next strip update.
++        bind(PREF_FLOATING_TABS, ChromePreferenceKeys.FLAGS_FLOATING_TABS_ENABLED, true, false);
++        bind(
++                PREF_BACKGROUND_TAB_CLOSE,
++                ChromePreferenceKeys.FLAGS_BACKGROUND_TAB_CLOSE_ENABLED,
++                false,
++                false);
++        bind(PREF_DARK_TAB_STRIP, ChromePreferenceKeys.FLAGS_DARK_TAB_STRIP_ENABLED, false, false);
++    }
++
++    private void bind(
++            String prefKey, String storageKey, boolean defaultValue, boolean needsRelaunch) {
++        ChromeSwitchPreference pref = findPreference(prefKey);
++        if (pref == null) return;
++        pref.setChecked(
++                ChromeSharedPreferences.getInstance().readBoolean(storageKey, defaultValue));
++        pref.setOnPreferenceChangeListener(
 +                (preference, newValue) -> {
 +                    ChromeSharedPreferences.getInstance()
-+                            .writeBoolean(
-+                                    ChromePreferenceKeys.FLAGS_FORCE_TABLET_UI_ENABLED,
-+                                    (boolean) newValue);
-+                    showRelaunchSnackbar();
++                            .writeBoolean(storageKey, (boolean) newValue);
++                    if (needsRelaunch) showRelaunchSnackbar();
 +                    return true;
 +                });
 +    }
 +
 +    private void showRelaunchSnackbar() {
-+        SnackbarManager manager = SupplierUtils.asNonNull(mSnackbarManagerSupplier).get();
-+        if (manager == null || manager.isShowing()) return;
++        Activity activity = getActivity();
++        if (!(activity instanceof SnackbarManageable)) return;
++        SnackbarManager manager = ((SnackbarManageable) activity).getSnackbarManager();
++        if (manager.isShowing()) return;
 +        Snackbar snackbar =
 +                Snackbar.make(
-+                                getString(R.string.ui_relaunch_notice),
++                                activity.getString(R.string.ui_relaunch_notice),
 +                                new SnackbarManager.SnackbarController() {
 +                                    @Override
 +                                    public void onAction(@Nullable Object actionData) {
@@ -129,28 +187,56 @@
 +                                },
 +                                Snackbar.TYPE_NOTIFICATION,
 +                                Snackbar.UMA_UNKNOWN)
-+                        .setAction(getString(R.string.relaunch), null)
++                        .setAction(activity.getString(R.string.relaunch), null)
 +                        .setDuration(70000);
 +        manager.showSnackbar(snackbar);
 +    }
 +
-     private void updatePreferences() {
-         // Avoids using large numbers of dependencies to simplify testing / mocking.
-         if (mSkipUpdatePreferencesForTesting) {
++    @Override
++    public MonotonicObservableSupplier<String> getPageTitle() {
++        return mPageTitle;
++    }
++
++    @Override
++    public @AnimationType int getAnimationType() {
++        return AnimationType.PROPERTY;
++    }
++}
 --- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
 +++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
-@@ -632,6 +632,21 @@ For more settings that use data to impro
+@@ -632,6 +632,42 @@ For more settings that use data to impro
        <message name="IDS_FORCE_TABLET_UI_TITLE" desc="Title of the preference that allows the user to update force tablet UI settings.">
          Force Tablet Mode
        </message>
 +      <message name="IDS_EXPERIMENTAL_SECTION_TITLE" desc="Header of the settings section that holds experimental options.">
 +        Experimental
 +      </message>
++      <message name="IDS_EXPERIMENTAL_TABS_TITLE" desc="Title of the settings page holding tab strip appearance options.">
++        Tabs
++      </message>
 +      <message name="IDS_ENABLE_TABS_TITLE" desc="Title of the preference that shows open tabs in a row above the address bar.">
 +        Enable tabs
 +      </message>
 +      <message name="IDS_ENABLE_TABS_SUMMARY" desc="Summary of the preference that shows open tabs in a row above the address bar.">
 +        Show open tabs in a row above the address bar
++      </message>
++      <message name="IDS_FLOATING_TABS_TITLE" desc="Title of the preference that draws each tab as a separate rounded card.">
++        Enable floating tabs
++      </message>
++      <message name="IDS_FLOATING_TABS_SUMMARY" desc="Summary of the preference that draws each tab as a separate rounded card.">
++        Draw every tab as a separate rounded card
++      </message>
++      <message name="IDS_BACKGROUND_TAB_CLOSE_TITLE" desc="Title of the preference that shows a close button on tabs that are not active.">
++        Show X button for background tabs
++      </message>
++      <message name="IDS_BACKGROUND_TAB_CLOSE_SUMMARY" desc="Summary of the preference that shows a close button on tabs that are not active.">
++        Show a close button on tabs that aren't active
++      </message>
++      <message name="IDS_DARK_TAB_STRIP_TITLE" desc="Title of the preference that darkens the tab strip so only the selected tab matches the address bar.">
++        Fix floating tab contrast
++      </message>
++      <message name="IDS_DARK_TAB_STRIP_SUMMARY" desc="Summary of the preference that darkens the tab strip so only the selected tab matches the address bar.">
++        Match the selected tab to the address bar and keep the strip and other tabs dark
 +      </message>
 +      <message name="IDS_RELAUNCH" desc="Text of the button that relaunches the browser so a pending setting can take effect.">
 +        Relaunch

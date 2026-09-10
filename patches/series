@@ -99,5 +99,8 @@ Cromite/Add-bookmark-import-export-actions.patch
 ungoogled-chromium-android/Enables-keyword-based-site-search-on-Android-devices.patch
 ungoogled-chromium-android/Add-more-search-engines-updated.patch
 Cromite/OpenSearch-miscellaneous.patch
-Other/Move-enable-tabs-toggle-to-main-settings.patch
+Other/Add-experimental-tabs-settings.patch
 Other/Change-package-name-more.patch
+Other/Tab-strip-options.patch
+Other/Rounded-address-bar.patch
+Other/Tab-strip-without-tablet-ui.patch

@@ -1,0 +1,317 @@
+--- a/chrome/android/chrome_java_sources.gni
++++ b/chrome/android/chrome_java_sources.gni
+@@ -385,6 +385,7 @@ chrome_java_sources = [
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelper.java",
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelperManager.java",
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTab.java",
++  "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutOptions.java",
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTabDelegate.java",
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTrailingButtonsCoordinator.java",
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutUtils.java",
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelper.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelper.java
+@@ -2319,11 +2319,20 @@ public class StripLayoutHelper
+             if (hoveredId != currTab.getTabId()) {
+                 StripLayoutTabDelegate.updateTabVisibility(currTab);
+             }
+-            boolean currContainerHidden = StripLayoutTabDelegate.isTabHidden(currTab);
++            // Floating tabs keep every container visible, which would suppress all dividers --
++            // treat "hidden" as "not the selected tab" there, so the dividers sit between the
++            // floating cards exactly where they sit between flat tabs.
++            boolean currContainerHidden =
++                    StripLayoutTabDelegate.isTabHidden(currTab)
++                            || (StripLayoutOptions.floatingTabsEnabled()
++                                    && !currTab.getIsSelected());
+ 
+             // 2. Set start divider visibility.
+             if (i > 0 && viewsOnStrip[i - 1] instanceof StripLayoutTab prevTab) {
+-                boolean prevContainerHidden = StripLayoutTabDelegate.isTabHidden(prevTab);
++                boolean prevContainerHidden =
++                        StripLayoutTabDelegate.isTabHidden(prevTab)
++                                || (StripLayoutOptions.floatingTabsEnabled()
++                                        && !prevTab.getIsSelected());
+                 boolean prevTabHasMargin = prevTab.getTrailingMargin() > 0;
+                 boolean startDividerVisible =
+                         !currTab.isDying()
+@@ -4636,8 +4645,9 @@ public class StripLayoutHelper
+         // tab creation, do not animate the fade-out. See (https://crbug.com/40231105).
+         boolean shouldShowCloseButton =
+                 !tab.getIsPinned()
+-                        && getCachedTabWidth(/* isPinned= */ false)
+-                                >= StripLayoutTabDelegate.TAB_WIDTH_MEDIUM;
++                        && (StripLayoutOptions.backgroundTabCloseEnabled()
++                                || getCachedTabWidth(/* isPinned= */ false)
++                                        >= StripLayoutTabDelegate.TAB_WIDTH_MEDIUM);
+         tab.setCanShowCloseButton(shouldShowCloseButton, false);
+ 
+         // This is an effective width of 0 due to how we overlap tabs.
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelperManager.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelperManager.java
+@@ -1733,6 +1733,11 @@ public class StripLayoutHelperManager
+     }
+ 
+     public @ColorInt int getBackgroundColor() {
++        // Dark strip: keep the strip darker than the toolbar so the selected tab, which uses the
++        // toolbar colour, is the only lit surface up there.
++        if (StripLayoutOptions.darkTabStripEnabled()) {
++            return StripLayoutOptions.getDarkStripColor(mContext, mIsIncognito);
++        }
+         return TabUiThemeUtil.getTabStripBackgroundColor(
+                 mContext, mIsIncognito, isAppInDesktopWindow(), mIsTopResumedActivity);
+     }
+--- /dev/null
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutOptions.java
+@@ -0,0 +1,64 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++package org.chromium.chrome.browser.compositor.overlays.strip;
++
++import android.content.Context;
++
++import androidx.annotation.ColorInt;
++
++import org.chromium.build.annotations.NullMarked;
++import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
++import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
++import org.chromium.chrome.browser.theme.ThemeUtils;
++import org.chromium.components.browser_ui.styles.ChromeColors;
++
++/** Reads the user-selectable tab strip appearance options. */
++@NullMarked
++public class StripLayoutOptions {
++    private StripLayoutOptions() {}
++
++    /** Whether every tab is drawn as a separate rounded, lifted container. */
++    public static boolean floatingTabsEnabled() {
++        return ChromeSharedPreferences.getInstance()
++                .readBoolean(ChromePreferenceKeys.FLAGS_FLOATING_TABS_ENABLED, true);
++    }
++
++    /** Whether tabs other than the selected one show their close button. */
++    public static boolean backgroundTabCloseEnabled() {
++        return ChromeSharedPreferences.getInstance()
++                .readBoolean(ChromePreferenceKeys.FLAGS_BACKGROUND_TAB_CLOSE_ENABLED, false);
++    }
++
++    /**
++     * Whether the strip and its unselected tabs are drawn darker than the toolbar. Only meaningful
++     * alongside floating tabs: without them the strip keeps its stock appearance, including the
++     * status bar above it.
++     */
++    public static boolean darkTabStripEnabled() {
++        return floatingTabsEnabled()
++                && ChromeSharedPreferences.getInstance()
++                        .readBoolean(ChromePreferenceKeys.FLAGS_DARK_TAB_STRIP_ENABLED, false);
++    }
++
++    /**
++     * The colour shared by the strip background and its unselected tabs: the toolbar's own
++     * background, i.e. what the address bar sits in.
++     */
++    public static @ColorInt int getDarkStripColor(Context context, boolean isIncognito) {
++        return ChromeColors.getDefaultThemeColor(context, isIncognito);
++    }
++
++    /**
++     * The colour of the selected tab: the address bar pill itself, so the active tab reads as the
++     * same surface as the omnibox.
++     */
++    public static @ColorInt int getSelectedTabColor(Context context, boolean isIncognito) {
++        return ThemeUtils.getTextBoxColorForToolbarBackgroundInNonNativePage(
++                context,
++                ChromeColors.getDefaultThemeColor(context, isIncognito),
++                isIncognito,
++                /* isCustomTab= */ false);
++    }
++}
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTab.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTab.java
+@@ -733,8 +733,11 @@ public class StripLayoutTab extends Stri
+     public @ColorInt int getTint() {
+         switch (mVisualState) {
+             case VisualState.SELECTED_HOVERED:
+-                return TabUiThemeUtil.getTabStripSelectedTabColor(mContext, isIncognito());
+             case VisualState.SELECTED:
++                // Dark strip: the selected tab takes the address bar's own colour.
++                if (StripLayoutOptions.darkTabStripEnabled()) {
++                    return StripLayoutOptions.getSelectedTabColor(mContext, isIncognito());
++                }
+                 return TabUiThemeUtil.getTabStripSelectedTabColor(mContext, isIncognito());
+             case VisualState.NON_DRAG_REORDERING:
+                 return TabUiThemeUtil.getTabStripBackgroundColor(mContext, isIncognito());
+@@ -748,6 +751,11 @@ public class StripLayoutTab extends Stri
+             case VisualState.PLACEHOLDER:
+                 return TabUiThemeUtil.getTabStripStartupContainerColor(mContext);
+             case VisualState.NORMAL:
++                // Dark strip: unselected tabs share the strip's own (darker) colour, so only the
++                // selected tab stands out by matching the toolbar.
++                if (StripLayoutOptions.darkTabStripEnabled()) {
++                    return StripLayoutOptions.getDarkStripColor(mContext, isIncognito());
++                }
+                 return ChromeColors.getDefaultBgColor(mContext, isIncognito());
+             default:
+                 assert false : "Invalid Visual State";
+@@ -851,6 +859,8 @@ public class StripLayoutTab extends Stri
+ 
+     /** Returns {@code true} if the tab should be visible. */
+     public boolean shouldBeVisible() {
++        // Floating tabs: every tab draws its own rounded container, not just the selected one.
++        if (StripLayoutOptions.floatingTabsEnabled()) return true;
+         return mIsSelected || mIsPlaceholder || mIsMultiSelected || getIsNonDragReordering();
+     }
+ 
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTabDelegate.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTabDelegate.java
+@@ -123,7 +123,9 @@ public class StripLayoutTabDelegate {
+         boolean canShow =
+                 !tab.getIsPinned()
+                         && (tab.getWidth() >= TAB_WIDTH_MEDIUM
+-                                || (tab.getIsSelected() && isFullyVisible));
++                                || (tab.getIsSelected() && isFullyVisible)
++                                || (StripLayoutOptions.backgroundTabCloseEnabled()
++                                        && isFullyVisible));
+ 
+         // A dying tab that is not selected should not show its close button.
+         // TODO(crbug.com/419843587): Await UX direction for close button appearance
+@@ -229,6 +231,22 @@ public class StripLayoutTabDelegate {
+         // TODO(crbug.com/436663313): Stop exposing this method, and handle solely in
+         //  #updateTabVisualState.
+         setTabVisibility(tab, tab.shouldBeVisible());
++        // The lifted ("folio") effect is otherwise only refreshed when a tab's visual state
++        // changes. The floating-tabs option can change without any such change, so re-apply it
++        // here, which runs on every layout pass, or the shape would stay stale until the tab is
++        // selected or hovered.
++        applyFolioEffect(tab);
++    }
++
++    /** Detaches every tab when floating tabs are on; otherwise only the non-selected ones. */
++    private static void applyFolioEffect(StripLayoutTab tab) {
++        if (StripLayoutOptions.floatingTabsEnabled() || !tab.getIsSelected()) {
++            tab.setFolioAttached(/* folioAttached= */ false);
++            tab.setBottomMargin(FOLIO_DETACHED_BOTTOM_MARGIN_DP);
++        } else {
++            tab.setFolioAttached(/* folioAttached= */ true);
++            tab.setBottomMargin(FOLIO_ATTACHED_BOTTOM_MARGIN_DP);
++        }
+     }
+ 
+     /**
+@@ -265,7 +283,10 @@ public class StripLayoutTabDelegate {
+         if (tab.getVisualState() == visualState) return;
+         tab.setVisualState(visualState);
+         // 1. Update Container Opacity.
+-        boolean shouldBeOpaque = visualState != VisualState.NORMAL;
++        // Floating tabs: every tab keeps a visible container, not just the selected/hovered one.
++        // This also suppresses the inter-tab dividers, which only draw when containers are hidden.
++        boolean shouldBeOpaque =
++                StripLayoutOptions.floatingTabsEnabled() || visualState != VisualState.NORMAL;
+ 
+         if (animate) {
+             float targetOpacity = shouldBeOpaque ? TAB_OPACITY_VISIBLE : TAB_OPACITY_HIDDEN;
+@@ -282,15 +303,10 @@ public class StripLayoutTabDelegate {
+         }
+ 
+         // 2. Update the "folio" lifted effect.
+-        // It should only apply to non-selected tabs.
+-        if (!tab.getIsSelected()) {
+-            tab.setFolioAttached(/* folioAttached= */ false);
+-            tab.setBottomMargin(FOLIO_DETACHED_BOTTOM_MARGIN_DP);
+-        } else {
+-            // Ensure selected tabs are "attached".
+-            tab.setFolioAttached(/* folioAttached= */ true);
+-            tab.setBottomMargin(FOLIO_ATTACHED_BOTTOM_MARGIN_DP);
+-        }
++        // Floating tabs: the selected tab stays detached too, so every tab is drawn with the
++        // fully rounded bg_tabstrip_tab_detached asset and lifted off the toolbar. Otherwise
++        // keep upstream behaviour, where only non-selected tabs are lifted.
++        applyFolioEffect(tab);
+     }
+ 
+     /** Calculates if the tab is fully visible and not partially hidden off-screen. */
+--- a/chrome/android/java/src/org/chromium/chrome/browser/ui/system/StatusBarColorController.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/ui/system/StatusBarColorController.java
+@@ -43,6 +43,8 @@ import org.chromium.chrome.browser.ntp_c
+ import org.chromium.chrome.browser.omnibox.UrlFocusChangeListener;
+ import org.chromium.chrome.browser.omnibox.suggestions.OmniboxSuggestionsDropdownScrollListener;
+ import org.chromium.chrome.browser.status_indicator.StatusIndicatorCoordinator;
++import org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutOptions;
++import org.chromium.ui.base.DeviceFormFactor;
+ import org.chromium.chrome.browser.tab.Tab;
+ import org.chromium.chrome.browser.tab.TabSelectionType;
+ import org.chromium.chrome.browser.tabmodel.TabModel;
+@@ -508,11 +510,14 @@ public class StatusBarColorController
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+             @ColorInt
+             int tabStripColor =
+-                    TabUiThemeUtil.getTabStripBackgroundColor(
+-                            mWindow.getContext(),
+-                            mIsIncognitoBranded,
+-                            AppHeaderUtils.isAppInDesktopWindow(mDesktopWindowStateManager),
+-                            mIsTopResumedActivity);
++                    StripLayoutOptions.darkTabStripEnabled()
++                            ? StripLayoutOptions.getDarkStripColor(
++                                    mWindow.getContext(), mIsIncognitoBranded)
++                            : TabUiThemeUtil.getTabStripBackgroundColor(
++                                    mWindow.getContext(),
++                                    mIsIncognitoBranded,
++                                    AppHeaderUtils.isAppInDesktopWindow(mDesktopWindowStateManager),
++                                    mIsTopResumedActivity);
+ 
+             @ColorInt int opaqueBgColor = ColorUtils.getOpaqueColor(tabStripColor);
+ 
+@@ -569,14 +574,20 @@ public class StatusBarColorController
+             return baseStatusBarColor;
+         }
+ 
+-        if (mIsTablet) {
+-            return mTabStripHiddenOnTablet
+-                    ? mToolbarColor
+-                    : TabUiThemeUtil.getTabStripBackgroundColor(
+-                            mWindow.getContext(),
+-                            mIsIncognitoBranded,
+-                            AppHeaderUtils.isAppInDesktopWindow(mDesktopWindowStateManager),
+-                            mIsTopResumedActivity);
++        // The strip can now be shown on a phone form factor too, and when it is the status bar
++        // sits directly above it, so it must take the strip's colour rather than the toolbar's.
++        if (mIsTablet || DeviceFormFactor.isForceTabletUI()) {
++            if (mTabStripHiddenOnTablet) return mToolbarColor;
++            // Dark strip: the status bar sits above the strip, so it takes the same colour.
++            if (StripLayoutOptions.darkTabStripEnabled()) {
++                return StripLayoutOptions.getDarkStripColor(
++                        mWindow.getContext(), mIsIncognitoBranded);
++            }
++            return TabUiThemeUtil.getTabStripBackgroundColor(
++                    mWindow.getContext(),
++                    mIsIncognitoBranded,
++                    AppHeaderUtils.isAppInDesktopWindow(mDesktopWindowStateManager),
++                    mIsTopResumedActivity);
+         }
+ 
+         // When Omnibox gains focus, we want to clear the status bar theme color.
+--- a/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
++++ b/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
+@@ -457,6 +457,10 @@ public final class ChromePreferenceKeys
+     public static final String HISTORY_APP_SPECIFIC_INFO_SEEN =
+             "Chrome.History.AppSpecificInfoSeen";
+     public static final String FLAGS_FORCE_TABLET_UI_ENABLED = "force_tablet_ui_enabled";
++    public static final String FLAGS_FLOATING_TABS_ENABLED = "floating_tabs_enabled";
++    public static final String FLAGS_BACKGROUND_TAB_CLOSE_ENABLED =
++            "background_tab_close_button_enabled";
++    public static final String FLAGS_DARK_TAB_STRIP_ENABLED = "dark_tab_strip_enabled";
+ 
+     /** Keys used to save settings related to homepage. */
+     public static final String DEPRECATED_HOMEPAGE_CUSTOM_URI = "homepage_custom_uri";
+--- a/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/LegacyChromePreferenceKeys.java
++++ b/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/LegacyChromePreferenceKeys.java
+@@ -57,6 +57,9 @@ public class LegacyChromePreferenceKeys
+                 ChromePreferenceKeys.FIRST_RUN_FLOW_SIGNIN_SETUP,
+                 ChromePreferenceKeys.FIRST_RUN_LIGHTWEIGHT_FLOW_COMPLETE,
+                 ChromePreferenceKeys.FLAGS_FORCE_TABLET_UI_ENABLED,
++                ChromePreferenceKeys.FLAGS_FLOATING_TABS_ENABLED,
++                ChromePreferenceKeys.FLAGS_BACKGROUND_TAB_CLOSE_ENABLED,
++                ChromePreferenceKeys.FLAGS_DARK_TAB_STRIP_ENABLED,
+                 ChromePreferenceKeys.FIRST_RUN_SKIP_WELCOME_PAGE,
+                 ChromePreferenceKeys.HISTORY_SHOW_HISTORY_INFO,
+                 ChromePreferenceKeys.HOMEPAGE_ENABLED,

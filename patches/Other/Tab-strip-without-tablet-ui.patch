@@ -1,0 +1,94 @@
+--- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
+@@ -1139,7 +1139,9 @@ public class ChromeTabbedActivity extend
+     }
+ 
+     private void setupCompositorContentForPhone() {
+-        if (isTablet()) return;
++        // The tab strip lives in the tablet layout manager, so opt out of the phone one
++        // when the strip is enabled even though this really is a phone.
++        if (isTablet() || DeviceFormFactor.isForceTabletUI()) return;
+ 
+         try (TraceEvent e =
+                 TraceEvent.scoped("ChromeTabbedActivity.setupCompositorContentForPhone")) {
+@@ -1165,7 +1167,7 @@ public class ChromeTabbedActivity extend
+     }
+ 
+     private void setupCompositorContentForTablet() {
+-        if (!isTablet()) return;
++        if (!isTablet() && !DeviceFormFactor.isForceTabletUI()) return;
+ 
+         try (TraceEvent e =
+                 TraceEvent.scoped("ChromeTabbedActivity.setupCompositorContentForTablet")) {
+@@ -1418,7 +1420,10 @@ public class ChromeTabbedActivity extend
+     private void setupCompositorContent() {
+         try (TraceEvent e = TraceEvent.scoped("ChromeTabbedActivity.setupCompositorContent")) {
+             if (!isLayoutManagerCreated()) {
+-                if (isTablet()) {
++                // The tab strip is owned by the tablet layout manager, so build that one whenever
++                // the strip is enabled -- including on a phone, where the form factor is honest
++                // and the phone toolbar/location bar remain in use.
++                if (isTablet() || DeviceFormFactor.isForceTabletUI()) {
+                     setupCompositorContentForTablet();
+                 } else {
+                     setupCompositorContentForPhone();
+--- a/ui/android/java/src/org/chromium/ui/base/DeviceFormFactor.java
++++ b/ui/android/java/src/org/chromium/ui/base/DeviceFormFactor.java
+@@ -87,6 +87,9 @@ public class DeviceFormFactor {
+     /** See {@link #setIsTabletForTesting(boolean)}. */
+     private static @Nullable Boolean sIsTabletForTesting;
+ 
++    // Set when the user enables the tab strip. It no longer changes the reported form factor:
++    // the strip is opted into explicitly (see ChromeTabbedActivity#setupCompositorContentFor*),
++    // so the phone toolbar and phone location bar stay in use.
+     private static boolean mForceTabletUI = false;
+     public static void setForceTabletUI(boolean forceTabletUI) {
+         mForceTabletUI = forceTabletUI;
+@@ -103,7 +106,6 @@ public class DeviceFormFactor {
+     @CalledByNative
+     @Deprecated
+     public static boolean isTablet() {
+-        if (mForceTabletUI) return true;
+         if (sIsTabletForTesting != null) {
+             return sIsTabletForTesting;
+         }
+@@ -134,7 +136,6 @@ public class DeviceFormFactor {
+      *     E.g. http://developer.samsung.com/samsung-dex/testing
+      */
+     public static boolean isNonMultiDisplayContextOnTablet(Context context) {
+-        if (mForceTabletUI) return true;
+         return detectScreenWidthBucket(context) >= SCREEN_BUCKET_TABLET;
+     }
+ 
+@@ -169,7 +170,6 @@ public class DeviceFormFactor {
+      * @return The screen width bucket the device is in (see constants at the top of this class).
+      */
+     private static int detectScreenWidthBucket(Context context) {
+-        if (mForceTabletUI) return SCREEN_BUCKET_TABLET;
+         return context.getResources().getInteger(R.integer.min_screen_width_bucket);
+     }
+ 
+@@ -177,7 +177,6 @@ public class DeviceFormFactor {
+         ThreadUtils.assertOnUiThread();
+         Context context = windowAndroid.getContext().get();
+         if (context == null) return 0;
+-        if (mForceTabletUI) return SCREEN_BUCKET_TABLET;
+         return context.getResources().getInteger(R.integer.min_screen_width_bucket);
+     }
+ 
+@@ -187,7 +186,6 @@ public class DeviceFormFactor {
+      */
+     @UiThread
+     public static int getNonMultiDisplayMinimumTabletWidthPx(Context context) {
+-        if (mForceTabletUI) return 0;
+         return getMinimumTabletWidthPx(DisplayAndroid.getNonMultiDisplay(context));
+     }
+ 
+@@ -196,7 +194,6 @@ public class DeviceFormFactor {
+      *         layout.
+      */
+     public static int getMinimumTabletWidthPx(DisplayAndroid display) {
+-        if (mForceTabletUI) return 0;
+         return DisplayUtil.dpToPx(display, DeviceFormFactor.MINIMUM_TABLET_WIDTH_DP);
+     }
+ }
