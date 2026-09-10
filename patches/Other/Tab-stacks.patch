@@ -1,0 +1,392 @@
+--- a/chrome/android/chrome_java_sources.gni
++++ b/chrome/android/chrome_java_sources.gni
+@@ -386,6 +386,8 @@ chrome_java_sources = [
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelperManager.java",
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTab.java",
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutOptions.java",
++  "java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabSelections.java",
++  "java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabStacks.java",
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTabDelegate.java",
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTrailingButtonsCoordinator.java",
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutUtils.java",
+--- a/chrome/android/java/res/values/ids.xml
++++ b/chrome/android/java/res/values/ids.xml
+@@ -252,6 +252,8 @@ found in the LICENSE file.
+     <item type="id" name="glic_menu_id" />
+     <item type="id" name="open_in_app_menu_id" />
+     <item type="id" name="close_tabs_to_the_right_menu_id" />
++    <item type="id" name="select_tab_menu_id" />
++    <item type="id" name="add_tab_to_new_stack_menu_id" />
+     <item type="id" name="close_other_tabs_menu_id" />
+     <item type="id" name="new_tab_to_the_right_menu_id" />
+     <item type="id" name="add_tab_to_reading_list_menu_id" />
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelper.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelper.java
+@@ -16,6 +16,8 @@ import static org.chromium.chrome.browse
+ import static org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutUtils.TAB_OVERLAP_WIDTH_DP;
+ import static org.chromium.chrome.browser.tasks.tab_management.TabUiThemeUtil.FOLIO_FOOT_LENGTH_DP;
+ 
++import org.chromium.chrome.browser.tasks.tab_management.TabUiThemeUtil;
++
+ import android.animation.Animator;
+ import android.animation.Animator.AnimatorListener;
+ import android.animation.AnimatorListenerAdapter;
+@@ -3361,10 +3363,13 @@ public class StripLayoutHelper
+             }
+             // The current tab is always multi selected. So we need to check if there are more tabs
+             // in multi-selection.
+-            if (mModel != null
+-                    && mModel.isTabMultiSelected(clickedTab.getTabId())
+-                    && mModel.getMultiSelectedTabsCount() > 1) {
+-                showTabContextMenu(getMultiSelectedTabIds(), clickedTab);
++            if (!TabSelections.isEmpty() && TabSelections.contains(clickedTab.getTabId())) {
++                // Long-press on a selected tab: the menu acts on the whole explicit selection.
++                showTabContextMenu(TabSelections.getIds(), clickedTab);
++            } else if (!TabSelections.isEmpty()) {
++                // Long-press on an unselected tab while selecting: keep the selection alive so
++                // "Select tab" can add this one to it.
++                showTabContextMenu(Collections.singletonList(clickedTab.getTabId()), clickedTab);
+             } else {
+                 if (mModel != null) {
+                     mModel.clearMultiSelection(/* notifyObservers= */ true);
+@@ -3454,6 +3459,12 @@ public class StripLayoutHelper
+             handleShiftClick(tab, /* isDestructive= */ true);
+         } else if (isCtrlPressed) {
+             handleCtrlClick(tab);
++        } else if (isInSelectionMode()) {
++            // Selection mode: while any tab is explicitly selected, a plain tap toggles the tapped
++            // tab's mark instead of switching to it -- the active tab included. Untoggling the
++            // last mark leaves selection mode and restores normal tapping.
++            TabSelections.toggle(tab.getTabId());
++            TabSelections.syncToModel(mModel);
+         } else {
+             selectTab(tab);
+             clearMultiSelection(/* clearAnchor= */ true, /* notifyObservers= */ true);
+@@ -5180,6 +5191,36 @@ public class StripLayoutHelper
+      * @return Whether the tab outline should be shown. True if 1. the tab is grouped and selected
+      *     and 2. the folio container is attached. False otherwise.
+      */
++    /**
++     * @return Whether {@code tabId} is part of the multi-selection but is not the active tab. The
++     *     active tab is always multi-selected, so it must be excluded for the selection outline to
++     *     mean "additionally selected".
++     */
++    /**
++     * @return Whether a multi-tab selection is currently being built. The active tab is always
++     *     counted as multi-selected, so more than one means the user has selected something.
++     */
++    private boolean isInSelectionMode() {
++        return !TabSelections.isEmpty();
++    }
++
++    /**
++     * @return Whether {@code tabId} should carry the selection ring: it is part of a
++     *     multi-selection holding more than just the active tab. The ring is drawn through the
++     *     keyboard-focus ring layer, the one strip ring that tab_handle_layer.cc insets correctly
++     *     for both the folio and the detached silhouettes -- the group outline asset only fits the
++     *     folio shape, and new binary assets cannot ship through this project's patch pipeline.
++     */
++    boolean shouldShowSelectionRing(int tabId) {
++        return TabSelections.contains(tabId);
++    }
++
++    /** {@return The colour of the selection ring} */
++    @ColorInt
++    int getSelectionRingColor() {
++        return TabUiThemeUtil.getTabTextColor(mContext, mIncognito);
++    }
++
+     protected boolean shouldShowTabOutline(StripLayoutTab stripLayoutTab) {
+         // Return false if null tab (e.g. placeholders have invalid tab IDs), ungrouped, or
+         // temporarily hidden while delete dialog is showing.
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelperManager.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelperManager.java
+@@ -1261,6 +1261,16 @@ public class StripLayoutHelperManager
+         return getActiveStripLayoutHelper().shouldShowTabOutline(tab);
+     }
+ 
++    /** {@return Whether the selection ring should be drawn around {@code tab}} */
++    public boolean shouldShowSelectionRing(StripLayoutTab tab) {
++        return getActiveStripLayoutHelper().shouldShowSelectionRing(tab.getTabId());
++    }
++
++    /** {@return The colour of the selection ring} */
++    public @ColorInt int getSelectionRingColor() {
++        return getActiveStripLayoutHelper().getSelectionRingColor();
++    }
++
+     /**
+      * @return The touch target offset to be applied to the new tab button.
+      */
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTab.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTab.java
+@@ -742,10 +742,14 @@ public class StripLayoutTab extends Stri
+             case VisualState.NON_DRAG_REORDERING:
+                 return TabUiThemeUtil.getTabStripBackgroundColor(mContext, isIncognito());
+             case VisualState.MULTISELECT_HOVERED:
+-                return TabUiThemeUtil.getTabStripMultiSelectedHoveredTabColor(
+-                        mContext, isIncognito());
+             case VisualState.MULTISELECT:
+-                return TabUiThemeUtil.getTabStripMultiSelectedTabColor(mContext, isIncognito());
++                // Selection is shown as an outline around the tab (see
++                // StripLayoutHelper#shouldShowTabOutline), not by tinting the whole tab, so a
++                // multi-selected tab keeps whatever fill it would otherwise have.
++                if (StripLayoutOptions.darkTabStripEnabled()) {
++                    return StripLayoutOptions.getDarkStripColor(mContext, isIncognito());
++                }
++                return ChromeColors.getDefaultBgColor(mContext, isIncognito());
+             case VisualState.HOVERED:
+                 return TabUiThemeUtil.getHoveredTabContainerColor(mContext, isIncognito());
+             case VisualState.PLACEHOLDER:
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabContextMenuCoordinator.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabContextMenuCoordinator.java
+@@ -342,6 +342,15 @@ public class TabContextMenuCoordinator e
+                 }
+             } else if (menuId == R.id.add_to_new_tab_group) {
+                 addToNewTabGroupItemCallback(tabModel, tabs, tabGroupCreationCallback);
++            } else if (menuId == R.id.select_tab_menu_id) {
++                // The explicit selection is free to include or exclude the active tab; the model's
++                // own current-tab invariant is upheld inside syncToModel.
++                TabSelections.add(tabs);
++                TabSelections.syncToModel(tabModel);
++            } else if (menuId == R.id.add_tab_to_new_stack_menu_id) {
++                TabStacks.createStack(tabs);
++                TabSelections.clear();
++                tabModel.clearMultiSelection(/* notifyObservers= */ true);
+             } else if (menuId == R.id.remove_from_tab_group) {
+                 removeFromTabGroupItemCallback(tabModel, tabs);
+             } else if (menuId == R.id.move_to_other_window_menu_id) {
+@@ -726,6 +735,9 @@ public class TabContextMenuCoordinator e
+                 itemList.add(createCloseTabsDirectionalItem(isIncognito));
+             }
+         }
++        itemList.add(buildMenuDivider(isIncognito));
++        itemList.add(createSelectTabItem(isIncognito));
++        itemList.add(createAddTabToNewStackItem(isIncognito));
+     }
+ 
+     private void buildMenuActionItemsForMultipleTabs(
+@@ -764,6 +776,9 @@ public class TabContextMenuCoordinator e
+                 itemList.add(createCloseTabsDirectionalItem(isIncognito));
+             }
+         }
++        itemList.add(buildMenuDivider(isIncognito));
++        itemList.add(createSelectTabItem(isIncognito));
++        itemList.add(createAddTabToNewStackItem(isIncognito));
+     }
+ 
+     private boolean shouldShowMoveToWindowItem(List<Tab> tabs, AnchorInfo anchorInfo) {
+@@ -1049,6 +1064,17 @@ public class TabContextMenuCoordinator e
+         return buildListItem(R.string.close, R.id.close_tab, isIncognito);
+     }
+ 
++    private ListItem createSelectTabItem(boolean isIncognito) {
++        return buildListItem(R.string.select_tab_menu_item, R.id.select_tab_menu_id, isIncognito);
++    }
++
++    private ListItem createAddTabToNewStackItem(boolean isIncognito) {
++        return buildListItem(
++                R.string.add_tab_to_new_stack_menu_item,
++                R.id.add_tab_to_new_stack_menu_id,
++                isIncognito);
++    }
++
+     private ListItem createCloseAllTabsItem(boolean isIncognito) {
+         int stringRes =
+                 isIncognito ? R.string.menu_close_all_incognito_tabs : R.string.menu_close_all_tabs;
+--- /dev/null
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabSelections.java
+@@ -0,0 +1,76 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++package org.chromium.chrome.browser.compositor.overlays.strip;
++
++import org.chromium.build.annotations.NullMarked;
++import org.chromium.chrome.browser.tab.Tab;
++import org.chromium.chrome.browser.tabmodel.TabModel;
++import org.chromium.chrome.browser.tabmodel.TabModelUtils;
++
++import java.util.ArrayList;
++import java.util.HashSet;
++import java.util.LinkedHashSet;
++import java.util.List;
++import java.util.Set;
++
++/**
++ * The user's explicit tab selection: the tabs marked via "Select tab" or by tapping while a
++ * selection is active.
++ *
++ * <p>Kept separate from {@link TabModel}'s multi-selection because the model requires the current
++ * tab in every non-empty selection (TabCollectionTabModelImpl asserts it), while the user's marks
++ * must be free to include or exclude the active tab. {@link #syncToModel} keeps the model's set at
++ * (explicit + current) so the invariant holds; everything user-visible reads the explicit set.
++ */
++@NullMarked
++public class TabSelections {
++    private static final Set<Integer> sExplicit = new LinkedHashSet<>();
++
++    private TabSelections() {}
++
++    /** Returns whether no tab is explicitly selected. */
++    public static boolean isEmpty() {
++        return sExplicit.isEmpty();
++    }
++
++    /** Returns whether {@code tabId} is explicitly selected. */
++    public static boolean contains(int tabId) {
++        return sExplicit.contains(tabId);
++    }
++
++    /** Marks {@code tabs} as selected. */
++    public static void add(List<Tab> tabs) {
++        for (Tab tab : tabs) sExplicit.add(tab.getId());
++    }
++
++    /** Toggles {@code tabId}'s membership. */
++    public static void toggle(int tabId) {
++        if (!sExplicit.remove(tabId)) sExplicit.add(tabId);
++    }
++
++    /** Returns the selected tab ids, in selection order. */
++    public static List<Integer> getIds() {
++        return new ArrayList<>(sExplicit);
++    }
++
++    /** Drops every mark. */
++    public static void clear() {
++        sExplicit.clear();
++    }
++
++    /** Mirrors the explicit set into {@code model}, keeping the model's own invariant intact. */
++    public static void syncToModel(TabModel model) {
++        sExplicit.removeIf(id -> model.getTabById(id) == null);
++        if (sExplicit.isEmpty()) {
++            model.clearMultiSelection(/* notifyObservers= */ true);
++            return;
++        }
++        Set<Integer> target = new HashSet<>(sExplicit);
++        int currentId = TabModelUtils.getCurrentTabId(model);
++        if (currentId != Tab.INVALID_TAB_ID) target.add(currentId);
++        model.clearMultiSelection(/* notifyObservers= */ false);
++        model.setTabsMultiSelected(target, /* isSelected= */ true);
++    }
++}
+--- /dev/null
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabStacks.java
+@@ -0,0 +1,75 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++package org.chromium.chrome.browser.compositor.overlays.strip;
++
++import org.chromium.build.annotations.NullMarked;
++import org.chromium.chrome.browser.tab.Tab;
++
++import java.util.ArrayList;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++
++/**
++ * Tab stacks: several tabs collapsed behind a single entry in the tab strip, Vivaldi style.
++ *
++ * <p>Deliberately not built on tab groups. A collapsed group draws a coloured title chip rather
++ * than one of its tabs, so a group can never present as "the tab you were last looking at", which
++ * is the whole point of a stack.
++ *
++ * <p>Membership is a side table keyed on the tab id, which is stable for the life of the tab and
++ * stays comparable after the tab is gone -- unlike a strip index, which shifts on every reorder.
++ * Storage is deliberately simple for now; it can move behind this same API later.
++ */
++@NullMarked
++public class TabStacks {
++    /** Returned for tabs that are not in any stack. */
++    public static final int NO_STACK = 0;
++
++    private static final Map<Integer, Integer> sTabIdToStackId = new HashMap<>();
++    private static int sNextStackId = 1;
++
++    private TabStacks() {}
++
++    /**
++     * Puts {@code tabs} into a newly created stack, removing them from any stack they were in. A
++     * tab belongs to at most one stack, the same rule Chromium applies to splits.
++     *
++     * @return the id of the new stack.
++     */
++    public static int createStack(List<Tab> tabs) {
++        int stackId = sNextStackId++;
++        for (Tab tab : tabs) {
++            sTabIdToStackId.put(tab.getId(), stackId);
++        }
++        return stackId;
++    }
++
++    /** Returns the stack containing {@code tabId}, or {@link #NO_STACK}. */
++    public static int getStackForTab(int tabId) {
++        Integer stackId = sTabIdToStackId.get(tabId);
++        return stackId == null ? NO_STACK : stackId;
++    }
++
++    /** Returns the tab ids in {@code stackId}, in no particular order. */
++    public static List<Integer> getTabsInStack(int stackId) {
++        List<Integer> tabIds = new ArrayList<>();
++        if (stackId == NO_STACK) return tabIds;
++        for (Map.Entry<Integer, Integer> entry : sTabIdToStackId.entrySet()) {
++            if (entry.getValue() == stackId) tabIds.add(entry.getKey());
++        }
++        return tabIds;
++    }
++
++    /** Returns how many tabs are in {@code stackId}. */
++    public static int getStackSize(int stackId) {
++        return getTabsInStack(stackId).size();
++    }
++
++    /** Forgets a tab, e.g. once it has been closed. */
++    public static void removeTab(int tabId) {
++        sTabIdToStackId.remove(tabId);
++    }
++}
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/scene_layer/TabStripSceneLayer.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/scene_layer/TabStripSceneLayer.java
+@@ -384,6 +384,7 @@ public class TabStripSceneLayer extends
+             final StripLayoutTab st = stripTabs[i];
+             boolean isSelected = st.getTabId() == selectedTabId;
+             boolean shouldShowOutline = layoutHelper.shouldShowTabOutline(st);
++            boolean showSelectionRing = layoutHelper.shouldShowSelectionRing(st);
+             @DrawableRes
+             int focusBackground =
+                     isSelected && shouldShowOutline
+@@ -448,9 +449,11 @@ public class TabStripSceneLayer extends
+                             st.isLoading(),
+                             st.getLoadingSpinnerRotation(),
+                             st.getContainerOpacity(),
+-                            st.isKeyboardFocused(),
++                            st.isKeyboardFocused() || showSelectionRing,
+                             focusBackground,
+-                            st.getKeyboardFocusRingColor(),
++                            showSelectionRing && !st.isKeyboardFocused()
++                                    ? layoutHelper.getSelectionRingColor()
++                                    : st.getKeyboardFocusRingColor(),
+                             st.getKeyboardFocusRingOffset(),
+                             st.getLineWidth(),
+                             Math.round(FOLIO_FOOT_LENGTH_DP * mDpToPx),
+--- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
++++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
+@@ -635,6 +635,12 @@ For more settings that use data to impro
+       <message name="IDS_EXPERIMENTAL_SECTION_TITLE" desc="Header of the settings section that holds experimental options.">
+         Experimental
+       </message>
++      <message name="IDS_SELECT_TAB_MENU_ITEM" desc="Tab strip context menu item that selects the tab, so further tabs can be added to the selection.">
++        Select tab
++      </message>
++      <message name="IDS_ADD_TAB_TO_NEW_STACK_MENU_ITEM" desc="Tab strip context menu item that collapses the tab into a newly created stack.">
++        Add tab to new stack
++      </message>
+       <message name="IDS_EXPERIMENTAL_TABS_TITLE" desc="Title of the settings page holding tab strip appearance options.">
+         Tabs
+       </message>
