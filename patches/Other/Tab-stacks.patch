@@ -1,0 +1,1589 @@
+--- a/chrome/android/chrome_java_sources.gni
++++ b/chrome/android/chrome_java_sources.gni
+@@ -386,6 +386,8 @@ chrome_java_sources = [
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelperManager.java",
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTab.java",
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutOptions.java",
++  "java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabSelections.java",
++  "java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabStacks.java",
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTabDelegate.java",
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTrailingButtonsCoordinator.java",
+   "java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutUtils.java",
+--- a/chrome/android/java/res/values/ids.xml
++++ b/chrome/android/java/res/values/ids.xml
+@@ -252,6 +252,9 @@ found in the LICENSE file.
+     <item type="id" name="glic_menu_id" />
+     <item type="id" name="open_in_app_menu_id" />
+     <item type="id" name="close_tabs_to_the_right_menu_id" />
++    <item type="id" name="select_tab_menu_id" />
++    <item type="id" name="add_tab_to_new_stack_menu_id" />
++    <item type="id" name="clear_tab_selection_menu_id" />
+     <item type="id" name="close_other_tabs_menu_id" />
+     <item type="id" name="new_tab_to_the_right_menu_id" />
+     <item type="id" name="add_tab_to_reading_list_menu_id" />
+--- a/chrome/android/java/res/xml/experimental_tabs_preferences.xml
++++ b/chrome/android/java/res/xml/experimental_tabs_preferences.xml
+@@ -6,7 +6,8 @@ found in the LICENSE file.
+ -->
+ 
+ <PreferenceScreen
+-    xmlns:android="http://schemas.android.com/apk/res/android">
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto">
+ 
+     <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
+         android:key="enable_tabs_switch"
+@@ -21,4 +22,18 @@ found in the LICENSE file.
+         android:dependency="floating_tabs_switch"
+         android:key="dark_tab_strip_switch"
+         android:title="@string/dark_tab_strip_title"/>
++    <SeekBarPreference
++        android:key="min_tab_width_pref"
++        android:layout="@layout/preference_widget_seekbar_material"
++        android:max="180"
++        android:persistent="false"
++        android:title="@string/min_tab_width_title"
++        app:min="90"
++        app:seekBarIncrement="5"
++        app:showSeekBarValue="true"
++        app:updatesContinuously="true"/>
++    <ListPreference
++        android:key="tab_stacking_pref"
++        android:persistent="false"
++        android:title="@string/tab_stacking_title"/>
+ </PreferenceScreen>
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/LayerTitleCache.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/LayerTitleCache.java
+@@ -24,6 +24,7 @@ import org.chromium.chrome.R;
+ import org.chromium.chrome.browser.compositor.layouts.content.TitleBitmapFactory;
+ import org.chromium.chrome.browser.flags.ChromeFeatureList;
+ import org.chromium.chrome.browser.incognito.IncognitoUtils;
++import org.chromium.chrome.browser.compositor.overlays.strip.TabStacks;
+ import org.chromium.chrome.browser.tab.Tab;
+ import org.chromium.chrome.browser.tab.TabFavicon;
+ import org.chromium.chrome.browser.tabmodel.TabGroupTitleUtils;
+@@ -158,6 +159,15 @@ public class LayerTitleCache {
+     private void buildUpdatedTitle(int tabId) {
+         if (mTabModelSelector == null) return;
+ 
++        if (TabStacks.isMirrorId(tabId)) {
++            // A tab stack's second row draws the active member a second time under a mirror id;
++            // that copy keeps the page's own title, never the stack's summary.
++            Tab real = mTabModelSelector.getTabById(TabStacks.mirroredTabId(tabId));
++            if (real == null || real.isDestroyed()) return;
++            buildTitle(real, getTitleForTab(real, ""), TabFavicon.getBitmap(real), tabId);
++            return;
++        }
++
+         Tab tab = mTabModelSelector.getTabById(tabId);
+         if (tab == null || tab.isDestroyed()) return;
+ 
+@@ -180,16 +190,37 @@ public class LayerTitleCache {
+         // If content view core is null, tab does not have direct access to the favicon, and we
+         // will initially show default favicon. But favicons are stored in the history database, so
+         // we will fetch favicons asynchronously from database.
+-        String titleString = getTitleForTab(tab, defaultTitle);
++        String pageTitle = getTitleForTab(tab, defaultTitle);
+         Bitmap tabFavicon = TabFavicon.getBitmap(tab);
+-        getUpdatedTitleInternal(tab, titleString, tabFavicon);
++
++        // The tab standing in for a stack is labelled with the stack's size instead of its page.
++        String stackTitle = getStackTitle(tab);
++        String titleString = stackTitle != null ? stackTitle : pageTitle;
++        buildTitle(tab, titleString, tabFavicon, tab.getId());
++
++        // Keep the second-row copy, if one exists, showing the page's own title.
++        int mirrorId = TabStacks.mirrorIdFor(tab.getId());
++        if (mTabTitles.get(mirrorId) != null) {
++            buildTitle(tab, pageTitle, tabFavicon, mirrorId);
++        }
++
+         if (tabFavicon == null) fetchFaviconForTab(tab);
+         return titleString;
+     }
+ 
+-    private String getUpdatedTitleInternal(
+-            Tab tab, String titleString, @Nullable Bitmap tabFavicon) {
+-        final int tabId = tab.getId();
++    /** Returns the "N tabs" label for a stack's representative, or null for an ordinary tab. */
++    private @Nullable String getStackTitle(Tab tab) {
++        if (mTabModelSelector == null) return null;
++        Tab current = mTabModelSelector.getCurrentTab();
++        int activeId = current == null ? Tab.INVALID_TAB_ID : current.getId();
++        if (!TabStacks.isRepresentative(tab.getId(), activeId)) return null;
++        int count = TabStacks.getTabsInStack(TabStacks.getStackForTab(tab.getId())).size();
++        return mContext.getString(R.string.tab_stack_tab_count, count);
++    }
++
++    private String buildTitle(
++            Tab tab, String titleString, @Nullable Bitmap tabFavicon, int cacheId) {
++        final int tabId = cacheId;
+         boolean isDarkTheme = tab.isIncognito();
+         boolean fetchFaviconFromHistory = tabFavicon == null;
+ 
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelper.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelper.java
+@@ -16,6 +16,8 @@ import static org.chromium.chrome.browse
+ import static org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutUtils.TAB_OVERLAP_WIDTH_DP;
+ import static org.chromium.chrome.browser.tasks.tab_management.TabUiThemeUtil.FOLIO_FOOT_LENGTH_DP;
+ 
++import org.chromium.chrome.browser.tasks.tab_management.TabUiThemeUtil;
++
+ import android.animation.Animator;
+ import android.animation.Animator.AnimatorListener;
+ import android.animation.AnimatorListenerAdapter;
+@@ -157,6 +159,7 @@ import java.util.Collections;
+ import java.util.HashSet;
+ import java.util.Iterator;
+ import java.util.List;
++import java.util.HashMap;
+ import java.util.Map;
+ import java.util.Objects;
+ import java.util.Set;
+@@ -535,6 +538,16 @@ public class StripLayoutHelper
+     private StripLayoutView[] mStripViews = new StripLayoutView[0];
+     private StripLayoutTab[] mStripTabs = new StripLayoutTab[0];
+     private StripLayoutTab[] mStripTabsToRender = new StripLayoutTab[0];
++    // Tab stacks (Two Level): the stack whose other members are laid out in a second row beneath
++    // the strip, or TabStacks.NO_STACK when the active tab is not in a stack.
++    private int mSubstripStackId = TabStacks.NO_STACK;
++    // Tab titles are cached as bitmaps per tab id, so the "N tabs" label a stack's face carries
++    // only changes when the bitmap is rebuilt. This records the label each tab is currently
++    // drawn with (0 = its own page title) so the cache can be refreshed when that changes.
++    private final Map<Integer, Integer> mStackFaceLabels = new HashMap<>();
++    // The active tab drawn a second time inside the second row. Its id is a mirror id (see
++    // native LayerTitleCache), so the compositor gives it its own layers and title.
++    private @Nullable StripLayoutTab mSubstripMirror;
+     private StripLayoutGroupTitle[] mStripGroupTitles = new StripLayoutGroupTitle[0];
+     private StripLayoutGroupTitle[] mStripGroupTitlesToRender = new StripLayoutGroupTitle[0];
+     private @Nullable StripLayoutTab mTabAtPositionForTesting;
+@@ -1629,6 +1642,9 @@ public class StripLayoutHelper
+      * @return Whether or not animations are done.
+      */
+     public boolean updateLayout(long time) {
++        // Apply any pending stack collapse/expand before laying out; no-op without stacks.
++        syncStacksWithStrip(/* animate= */ false);
++
+         // 1.a. Handle any Scroller movements (flings).
+         if (mScrollDelegate.updateScrollInProgress(time)) {
+             // 1.b. Scroll still in progress, so request update.
+@@ -1952,6 +1968,10 @@ public class StripLayoutHelper
+      */
+     public void multipleTabsClosed(List<Tab> tabs) {
+         for (Tab tab : tabs) {
++            TabStacks.removeTab(tab.getId());
++            TabSelections.remove(tab.getId());
++        }
++        for (Tab tab : tabs) {
+             StripLayoutTab stripTab = findTabById(tab.getId());
+             if (stripTab != null && !stripTab.isDying()) {
+                 mClosingTabs.add(stripTab);
+@@ -2314,6 +2334,8 @@ public class StripLayoutHelper
+         StripLayoutView[] viewsOnStrip = StripLayoutUtils.getViewsOnStrip(mStripViews);
+         for (int i = 0; i < viewsOnStrip.length; ++i) {
+             if (!(viewsOnStrip[i] instanceof StripLayoutTab currTab)) continue;
++            // Second-row tabs get their dividers from layoutSubstrip(), as a row of their own.
++            if (isSubstripTab(currTab)) continue;
+ 
+             // 1. Set container visibility. Handled in a separate animation for hovered tabs.
+             if (hoveredId != currTab.getTabId()) {
+@@ -2327,8 +2349,16 @@ public class StripLayoutHelper
+                             || (StripLayoutOptions.floatingTabsEnabled()
+                                     && !currTab.getIsSelected());
+ 
+-            // 2. Set start divider visibility.
+-            if (i > 0 && viewsOnStrip[i - 1] instanceof StripLayoutTab prevTab) {
++            // 2. Set start divider visibility. A folded stack member takes no space in the main
++            // row, so the visual neighbour is the nearest view before it that is not folded.
++            int prevIndex = i - 1;
++            while (prevIndex >= 0
++                    && viewsOnStrip[prevIndex] instanceof StripLayoutTab candidate
++                    && candidate.isCollapsed()
++                    && TabStacks.getStackForTab(candidate.getTabId()) != TabStacks.NO_STACK) {
++                prevIndex--;
++            }
++            if (prevIndex >= 0 && viewsOnStrip[prevIndex] instanceof StripLayoutTab prevTab) {
+                 boolean prevContainerHidden =
+                         StripLayoutTabDelegate.isTabHidden(prevTab)
+                                 || (StripLayoutOptions.floatingTabsEnabled()
+@@ -2513,6 +2543,8 @@ public class StripLayoutHelper
+      */
+     public void onDown(float x, float y, int buttons) {
+         resetTabCloseButtonPressedState();
++        // Second-row tabs act on click; there is nothing to press or drag there.
++        if (isInSubstripBand(y)) return;
+         if (mNewTabButton.onDown(x, y, buttons) || mTabSearchButton.onDown(x, y, buttons)) {
+             mRenderHost.requestRender();
+             return;
+@@ -2540,6 +2572,15 @@ public class StripLayoutHelper
+      */
+     public void onLongPress(float x, float y) {
+         resetTabCloseButtonPressedState();
++        if (isInSubstripBand(y)) {
++            StripLayoutTab substripTab = findSubstripTabAt(x, y);
++            StripLayoutTab target =
++                    substripTab == null ? null : realTabForSubstripView(substripTab);
++            if (target != null) {
++                showTabContextMenu(Collections.singletonList(target.getTabId()), target);
++            }
++            return;
++        }
+         StripLayoutView stripView = determineClickedView(x, y, /* buttons= */ 0);
+ 
+         if (stripView == null) {
+@@ -3245,18 +3286,28 @@ public class StripLayoutHelper
+      * @param modifiers State of all Meta/Modifier keys that are pressed.
+      */
+     public void click(long time, float x, float y, int buttons, int modifiers) {
++        if (isInSubstripBand(y)) {
++            handleSubstripClick(x, y, buttons);
++            return;
++        }
+         StripLayoutView clickedView = determineClickedView(x, y, buttons);
+         clearLastHoveredTab();
+         if (clickedView == null) {
+             if (MotionEventUtils.isSecondaryClick(buttons)) {
+                 // A right click on empty strip space should trigger the strip context menu.
+                 showTabStripContextMenu(x, y);
++                return;
+             }
++            // A click that misses every tab leaves selection mode.
++            exitSelectionMode();
+             return;
+         }
+         if (MotionEventUtils.isSecondaryClick(buttons)) {
+             showContextMenu(clickedView);
+         } else {
++            // Anything on the strip that is not a tab -- the new tab button, the strip's own
++            // buttons -- also leaves selection mode before it acts.
++            if (!(clickedView instanceof StripLayoutTab)) exitSelectionMode();
+             clickedView.handleClick(time, buttons, modifiers);
+         }
+     }
+@@ -3361,10 +3412,13 @@ public class StripLayoutHelper
+             }
+             // The current tab is always multi selected. So we need to check if there are more tabs
+             // in multi-selection.
+-            if (mModel != null
+-                    && mModel.isTabMultiSelected(clickedTab.getTabId())
+-                    && mModel.getMultiSelectedTabsCount() > 1) {
+-                showTabContextMenu(getMultiSelectedTabIds(), clickedTab);
++            if (!TabSelections.isEmpty() && TabSelections.contains(clickedTab.getTabId())) {
++                // Long-press on a selected tab: the menu acts on the whole explicit selection.
++                showTabContextMenu(TabSelections.getIds(), clickedTab);
++            } else if (!TabSelections.isEmpty()) {
++                // Long-press on an unselected tab while selecting: keep the selection alive so
++                // "Select tab" can add this one to it.
++                showTabContextMenu(Collections.singletonList(clickedTab.getTabId()), clickedTab);
+             } else {
+                 if (mModel != null) {
+                     mModel.clearMultiSelection(/* notifyObservers= */ true);
+@@ -3454,8 +3508,38 @@ public class StripLayoutHelper
+             handleShiftClick(tab, /* isDestructive= */ true);
+         } else if (isCtrlPressed) {
+             handleCtrlClick(tab);
++        } else if (isInSelectionMode()) {
++            // Selection mode: while any tab is explicitly selected, a plain tap toggles the tapped
++            // tab's mark instead of switching to it -- the active tab included. Untoggling the
++            // last mark leaves selection mode and restores normal tapping.
++            TabSelections.toggle(tab.getTabId());
++            TabSelections.syncToModel(mModel);
+         } else {
+-            selectTab(tab);
++            int tabId = tab.getTabId();
++            int stackId = TabStacks.getStackForTab(tabId);
++            if (TabStacks.stackingEnabled() && stackId != TabStacks.NO_STACK) {
++                // Accordion stacks: tapping the representative of a collapsed stack activates it
++                // and fans the members out; tapping the active tab of an expanded stack folds
++                // them back behind it. Any other member tap is a plain activation.
++                boolean isActive = tabId == getSelectedTabId();
++                if (StripLayoutOptions.tabStackingMode()
++                        == StripLayoutOptions.STACKING_TWO_LEVEL) {
++                    // Two Level: activating the representative reveals the stack's other members
++                    // in the row beneath; there is nothing to fold inline.
++                    if (!isActive) selectTab(tab);
++                } else if (TabStacks.isCollapsed(stackId)) {
++                    TabStacks.setCollapsed(stackId, false);
++                    if (!isActive) selectTab(tab);
++                    syncStacksWithStrip(/* animate= */ true);
++                } else if (isActive) {
++                    TabStacks.setCollapsed(stackId, true);
++                    syncStacksWithStrip(/* animate= */ true);
++                } else {
++                    selectTab(tab);
++                }
++            } else {
++                selectTab(tab);
++            }
+             clearMultiSelection(/* clearAnchor= */ true, /* notifyObservers= */ true);
+         }
+ 
+@@ -4784,7 +4868,10 @@ public class StripLayoutHelper
+ 
+         // 4. Calculate the realistic tab width.
+         mCachedTabWidthSupplier.set(
+-                MathUtils.clamp(optimalTabWidth, MIN_TAB_WIDTH_DP, MAX_TAB_WIDTH_DP));
++                MathUtils.clamp(
++                        optimalTabWidth,
++                        StripLayoutOptions.minTabWidthDp(MIN_TAB_WIDTH_DP),
++                        MAX_TAB_WIDTH_DP));
+     }
+ 
+     /**
+@@ -4903,6 +4990,8 @@ public class StripLayoutHelper
+     }
+ 
+     private void updateStrip() {
++        resetSubstripWidths();
++
+         // 1. Update the scroll offset limits
+         updateScrollOffsetLimits();
+ 
+@@ -4923,6 +5012,9 @@ public class StripLayoutHelper
+                 mNewTabButtonWidth,
+                 isTabStripFull());
+ 
++        // 3b. Place the active stack's other members in the second row.
++        layoutSubstrip();
++
+         // 4. Create render list.
+         createRenderList();
+ 
+@@ -5049,9 +5141,13 @@ public class StripLayoutHelper
+         int tabRenderCount = getVisibleViewCount(mStripTabs);
+         int groupTitleRenderCount = getVisibleViewCount(mStripGroupTitles);
+ 
++        // The second row's mirror of the active tab renders alongside the strip's own tabs.
++        boolean renderMirror = mSubstripMirror != null && mSubstripMirror.isVisible();
++        int tabsToRenderCount = tabRenderCount + (renderMirror ? 1 : 0);
++
+         // 2. Reallocate the render list if necessary.
+-        if (mStripTabsToRender.length != tabRenderCount) {
+-            mStripTabsToRender = new StripLayoutTab[tabRenderCount];
++        if (mStripTabsToRender.length != tabsToRenderCount) {
++            mStripTabsToRender = new StripLayoutTab[tabsToRenderCount];
+         }
+         if (mStripGroupTitlesToRender.length != groupTitleRenderCount) {
+             mStripGroupTitlesToRender = new StripLayoutGroupTitle[groupTitleRenderCount];
+@@ -5059,6 +5155,7 @@ public class StripLayoutHelper
+ 
+         // 3. Populate it with the visible tabs.
+         populateVisibleViews(mStripTabs, mStripTabsToRender);
++        if (renderMirror) mStripTabsToRender[tabRenderCount] = mSubstripMirror;
+         populateVisibleViews(mStripGroupTitles, mStripGroupTitlesToRender);
+     }
+ 
+@@ -5180,6 +5277,258 @@ public class StripLayoutHelper
+      * @return Whether the tab outline should be shown. True if 1. the tab is grouped and selected
+      *     and 2. the folio container is attached. False otherwise.
+      */
++    /**
++     * @return Whether {@code tabId} is part of the multi-selection but is not the active tab. The
++     *     active tab is always multi-selected, so it must be excluded for the selection outline to
++     *     mean "additionally selected".
++     */
++    /**
++     * @return Whether a multi-tab selection is currently being built. The active tab is always
++     *     counted as multi-selected, so more than one means the user has selected something.
++     */
++    /** Drops the explicit selection, if any, and repaints. */
++    private void exitSelectionMode() {
++        if (TabSelections.isEmpty()) return;
++        TabSelections.clear();
++        if (mModel != null) mModel.clearMultiSelection(/* notifyObservers= */ true);
++        mUpdateHost.requestUpdate();
++    }
++
++    private boolean isInSelectionMode() {
++        return !TabSelections.isEmpty();
++    }
++
++    /**
++     * Reconciles the strip with the stack side table: members of a collapsed stack are collapsed
++     * behind the representative; everything else is expanded. Reuses the tab-group collapse
++     * primitives so widths reflow exactly as a collapsed group's do. Cheap when no stacks exist.
++     */
++    private void syncStacksWithStrip(boolean animate) {
++        if (mModel == null) return;
++        int activeId = getSelectedTabId();
++        boolean twoLevel =
++                StripLayoutOptions.tabStackingMode() == StripLayoutOptions.STACKING_TWO_LEVEL;
++        int activeStackId = twoLevel ? TabStacks.getStackForTab(activeId) : TabStacks.NO_STACK;
++        if (activeStackId != TabStacks.NO_STACK
++                && TabStacks.getTabsInStack(activeStackId).size() < 2) {
++            activeStackId = TabStacks.NO_STACK;
++        }
++        mSubstripStackId = activeStackId;
++        refreshStackTitles();
++
++        List<StripLayoutTab> toChange = new ArrayList<>();
++        List<Boolean> toHidden = new ArrayList<>();
++        for (StripLayoutTab stripTab : mStripTabs) {
++            Tab tab = getTabById(stripTab.getTabId());
++            // Tabs under a real group title keep their group's collapse semantics; stacks never
++            // touch them. Checked against the visible title rather than the raw group id, so a
++            // solo tab that merely carries a group token is still stackable.
++            if (tab == null || findGroupTitle(tab.getTabGroupId()) != null) continue;
++            int tabId = stripTab.getTabId();
++            boolean hidden = TabStacks.isHiddenByStack(tabId, activeId);
++            // The active stack's other members drop into the second row.
++            boolean inSubstrip =
++                    hidden
++                            && activeStackId != TabStacks.NO_STACK
++                            && TabStacks.getStackForTab(tabId) == activeStackId;
++            float offsetY = inSubstrip ? mHeight : 0f;
++            if (stripTab.getOffsetY() != offsetY) stripTab.setOffsetY(offsetY);
++            if (stripTab.isCollapsed() == hidden) continue;
++            toChange.add(stripTab);
++            toHidden.add(hidden);
++        }
++        if (toChange.isEmpty()) return;
++        if (animate) finishAnimations();
++        List<Animator> animators = animate ? new ArrayList<>() : null;
++        for (int i = 0; i < toChange.size(); i++) {
++            Animator animator = updateTabCollapsed(toChange.get(i), toHidden.get(i), animate);
++            if (animators != null && animator != null) animators.add(animator);
++        }
++        finishAnimationsAndCloseDyingTabs();
++        List<Animator> resizeAnimators =
++                computeAndUpdateTabWidth(/* animate= */ animate, /* deferAnimations= */ animate);
++        if (animators != null) {
++            if (resizeAnimators != null) animators.addAll(resizeAnimators);
++            if (!animators.isEmpty()) startAnimations(animators);
++        }
++        mUpdateHost.requestUpdate();
++    }
++
++    /**
++     * Rebuilds the cached title of any tab whose stack label changed -- it became a stack's face,
++     * stopped being one, or its stack changed size.
++     */
++    private void refreshStackTitles() {
++        if (mLayerTitleCache == null || mModel == null) return;
++        int activeId = getSelectedTabId();
++        for (StripLayoutTab stripTab : mStripTabs) {
++            int tabId = stripTab.getTabId();
++            int label =
++                    TabStacks.isRepresentative(tabId, activeId)
++                            ? TabStacks.getTabsInStack(TabStacks.getStackForTab(tabId)).size()
++                            : 0;
++            Integer drawn = mStackFaceLabels.get(tabId);
++            if (drawn != null && drawn == label) continue;
++            mStackFaceLabels.put(tabId, label);
++            Tab tab = getTabById(tabId);
++            if (tab != null) mLayerTitleCache.getUpdatedTitle(tab, "");
++        }
++    }
++
++    /** Whether the active tab's stack is currently laid out in a second row beneath the strip. */
++    boolean isSubstripVisible() {
++        return mSubstripStackId != TabStacks.NO_STACK;
++    }
++
++    private boolean isSubstripTab(StripLayoutTab tab) {
++        return mSubstripStackId != TabStacks.NO_STACK
++                && tab.isCollapsed()
++                && TabStacks.getStackForTab(tab.getTabId()) == mSubstripStackId;
++    }
++
++    /**
++     * Folded stack members count for nothing in the main row: keep them at overlap width there.
++     * This also undoes the real width the second row gave them once that row is gone.
++     */
++    private void resetSubstripWidths() {
++        for (StripLayoutTab tab : mStripTabs) {
++            if (tab.isCollapsed()
++                    && TabStacks.getStackForTab(tab.getTabId()) != TabStacks.NO_STACK
++                    && tab.getWidth() != TAB_OVERLAP_WIDTH_DP) {
++                tab.setWidth(TAB_OVERLAP_WIDTH_DP);
++            }
++        }
++    }
++
++    /**
++     * Lays the active stack's other members out, in strip order, in the row beneath the main one
++     * -- after the main row has been positioned, so they render and take touches there.
++     */
++    private void layoutSubstrip() {
++        if (mSubstripStackId == TabStacks.NO_STACK) {
++            if (mSubstripMirror != null) mSubstripMirror.setVisible(false);
++            return;
++        }
++        boolean rtl = LocalizationUtils.isLayoutRtl();
++        int activeId = getSelectedTabId();
++        // The row fits all of the stack's members: the main row's width when it is narrow enough,
++        // otherwise shared out like a full main row would be, never below the minimum tab width.
++        int memberCount = TabStacks.getTabsInStack(mSubstripStackId).size();
++        float available = mWidth - mLeftMargin - mRightMargin;
++        float fitWidth = (available + TAB_OVERLAP_WIDTH_DP * (memberCount - 1)) / memberCount;
++        float width =
++                Math.max(
++                        StripLayoutTab.MIN_WIDTH,
++                        Math.min(getCachedTabWidth(/* isPinned= */ false), fitWidth));
++        float x = rtl ? mWidth - mRightMargin - width : mLeftMargin;
++        List<StripLayoutTab> rowTabs = new ArrayList<>();
++        for (StripLayoutTab tab : mStripTabs) {
++            if (TabStacks.getStackForTab(tab.getTabId()) != mSubstripStackId) continue;
++            StripLayoutTab rowTab;
++            if (isSubstripTab(tab)) {
++                rowTab = tab;
++            } else if (tab.getTabId() == activeId) {
++                // The active member is the stack's face in the main row; the row beneath shows
++                // it again, highlighted, through a mirror view.
++                rowTab = ensureSubstripMirror(activeId);
++            } else {
++                continue;
++            }
++            rowTab.setWidth(width);
++            rowTab.setDrawX(x);
++            rowTab.setDrawY(mHeight);
++            boolean fits = rtl ? x >= mLeftMargin : x + width <= mWidth - mRightMargin;
++            rowTab.setVisible(fits);
++            if (rowTab == mSubstripMirror) StripLayoutTabDelegate.updateTabVisibility(rowTab);
++            x += MathUtils.flipSignIf(width - TAB_OVERLAP_WIDTH_DP, rtl);
++            rowTabs.add(rowTab);
++        }
++        // Dividers follow the main row's rule, but over this row's own sequence: none before the
++        // first tab, one between two unselected neighbours, one after the last unselected tab.
++        for (int i = 0; i < rowTabs.size(); i++) {
++            StripLayoutTab rowTab = rowTabs.get(i);
++            boolean hidden = isDividerHidden(rowTab);
++            boolean prevHidden = i > 0 && isDividerHidden(rowTabs.get(i - 1));
++            rowTab.setStartDividerVisible(i > 0 && hidden && prevHidden);
++            rowTab.setEndDividerVisible(i == rowTabs.size() - 1 && hidden);
++        }
++    }
++
++    /** The "container hidden" notion the divider rules use, floating tabs included. */
++    private static boolean isDividerHidden(StripLayoutTab tab) {
++        return StripLayoutTabDelegate.isTabHidden(tab)
++                || (StripLayoutOptions.floatingTabsEnabled() && !tab.getIsSelected());
++    }
++
++    private StripLayoutTab ensureSubstripMirror(int tabId) {
++        int mirrorId = TabStacks.mirrorIdFor(tabId);
++        if (mSubstripMirror == null || mSubstripMirror.getTabId() != mirrorId) {
++            mSubstripMirror =
++                    new StripLayoutTab(
++                            mContext,
++                            mirrorId,
++                            /* clickHandler= */ this,
++                            /* longClickHandler= */ this,
++                            /* keyboardFocusHandler= */ this,
++                            /* accessibilityFocusHandler= */ this,
++                            mTabLoadTrackerHost,
++                            mUpdateHost,
++                            mIncognito,
++                            /* isPinned= */ false,
++                            MediaState.NONE);
++            mSubstripMirror.setHeight(mHeight);
++            mTabDelegate.setIsTabSelected(mSubstripMirror, true);
++        }
++        return mSubstripMirror;
++    }
++
++    /** The real strip tab behind a second-row view, which may be the mirror. */
++    private @Nullable StripLayoutTab realTabForSubstripView(StripLayoutTab view) {
++        return view == mSubstripMirror ? findTabById(TabStacks.mirroredTabId(view.getTabId())) : view;
++    }
++
++    private boolean isInSubstripBand(float y) {
++        return mSubstripStackId != TabStacks.NO_STACK && y >= mHeight;
++    }
++
++    private @Nullable StripLayoutTab findSubstripTabAt(float x, float y) {
++        if (mSubstripMirror != null && mSubstripMirror.checkClickedOrHovered(x, y)) {
++            return mSubstripMirror;
++        }
++        for (StripLayoutTab tab : mStripTabs) {
++            if (isSubstripTab(tab) && tab.checkClickedOrHovered(x, y)) return tab;
++        }
++        return null;
++    }
++
++    private void handleSubstripClick(float x, float y, int buttons) {
++        StripLayoutTab tab = findSubstripTabAt(x, y);
++        if (tab == null) return;
++        StripLayoutTab target = realTabForSubstripView(tab);
++        if (target == null) return;
++        if (tab.checkCloseHitTest(x, y) || MotionEventUtils.isTertiaryButton(buttons)) {
++            handleCloseButtonClick(target, buttons);
++            return;
++        }
++        if (target.getTabId() != getSelectedTabId()) selectTab(target);
++    }
++
++    /**
++     * @return Whether {@code tabId} should carry the selection ring: it is part of a
++     *     multi-selection holding more than just the active tab. The ring is drawn through the
++     *     keyboard-focus ring layer, the one strip ring that tab_handle_layer.cc insets correctly
++     *     for both the folio and the detached silhouettes -- the group outline asset only fits the
++     *     folio shape, and new binary assets cannot ship through this project's patch pipeline.
++     */
++    boolean shouldShowSelectionRing(int tabId) {
++        // A stack's representative carries a persistent outline so the stack reads as one entry.
++        return TabSelections.contains(tabId)
++                || TabStacks.isRepresentative(tabId, getSelectedTabId());
++    }
++
++    /** {@return The colour of the selection ring} */
++    @ColorInt
++
+     protected boolean shouldShowTabOutline(StripLayoutTab stripLayoutTab) {
+         // Return false if null tab (e.g. placeholders have invalid tab IDs), ungrouped, or
+         // temporarily hidden while delete dialog is showing.
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelperManager.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelperManager.java
+@@ -220,6 +220,8 @@ public class StripLayoutHelperManager
+     // UI State
+     private float mWidth; // in dp units
+     private float mHeight; // Height of the entire tab strip compositor layer in DP.
++    private @Nullable Callback<Integer> mExtraHeightRequestCallback;
++    private boolean mSubstripVisible;
+     private final float mScrollableStripHeight; // Height of the scrollable tab strip layer in DP.
+ 
+     // Padding regions that tabs should remain untouchable.
+@@ -1039,7 +1041,9 @@ public class StripLayoutHelperManager
+             setStripVisibilityState(StripVisibilityState.HIDDEN_BY_FADE, /* clear= */ true);
+         }
+ 
+-        if (mIsHeaderCustomizationSupported) {
++        // Outside desktop windowing the layer keeps its height through hide transitions, but a
++        // visible height (the resource height, or one grown by a second stack row) is applied.
++        if (mIsHeaderCustomizationSupported || newHeightPx > 0) {
+             mHeight = newHeightPx / mDensity;
+             mTopPadding = topPaddingPx / mDensity;
+             onSizeChanged(mWidth, mHeight, mLastVisibleViewportOffsetY, mOrientation);
+@@ -1047,6 +1051,14 @@ public class StripLayoutHelperManager
+     }
+ 
+     @Override
++    public void setExtraHeightRequestCallback(@Nullable Callback<Integer> callback) {
++        mExtraHeightRequestCallback = callback;
++        if (callback != null && mSubstripVisible) {
++            callback.onResult(Math.round(mScrollableStripHeight * mDensity));
++        }
++    }
++
++    @Override
+     public void onLayerYOffsetChanged(int yOffsetPx, int visibleHeightPx) {
+         float yOffsetDp = yOffsetPx / mDensity;
+         float visibleHeightDp = visibleHeightPx / mDensity;
+@@ -1261,6 +1273,12 @@ public class StripLayoutHelperManager
+         return getActiveStripLayoutHelper().shouldShowTabOutline(tab);
+     }
+ 
++    /** {@return Whether the selection ring should be drawn around {@code tab}} */
++    public boolean shouldShowSelectionRing(StripLayoutTab tab) {
++        return getActiveStripLayoutHelper().shouldShowSelectionRing(tab.getTabId());
++    }
++
++
+     /**
+      * @return The touch target offset to be applied to the new tab button.
+      */
+@@ -1724,6 +1742,11 @@ public class StripLayoutHelperManager
+         }
+     }
+ 
++    /** The height of one strip row -- the scrolling row, excluding any tab stack second row. */
++    public float getScrollableStripHeight() {
++        return mScrollableStripHeight;
++    }
++
+     public float getHeight() {
+         return mHeight;
+     }
+@@ -1746,6 +1769,16 @@ public class StripLayoutHelperManager
+     public boolean updateOverlay(long time, long dt) {
+         getInactiveStripLayoutHelper().finishAnimationsAndPushTabUpdates();
+         boolean animationFinished = getActiveStripLayoutHelper().updateLayout(time);
++        // Tab stacks (Two Level): grow the strip by one row while the active tab's stack is laid
++        // out beneath it, and give the row back when it is not.
++        boolean substripVisible = getActiveStripLayoutHelper().isSubstripVisible();
++        if (substripVisible != mSubstripVisible) {
++            mSubstripVisible = substripVisible;
++            if (mExtraHeightRequestCallback != null) {
++                mExtraHeightRequestCallback.onResult(
++                        substripVisible ? Math.round(mScrollableStripHeight * mDensity) : 0);
++            }
++        }
+         if (animationFinished) {
+             // Update the touchable area when tab strip has an update on its layout. This is
+             // probably an overkill, since the touch size does not change when the tab is full.
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutOptions.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutOptions.java
+@@ -42,6 +42,38 @@ public class StripLayoutOptions {
+                         .readBoolean(ChromePreferenceKeys.FLAGS_DARK_TAB_STRIP_ENABLED, false);
+     }
+ 
++    /** Tab stacking is off; stacks never hide anything. */
++    public static final int STACKING_DISABLED = 0;
++
++    /** A collapsed stack shows only its representative; expanding fans members out inline. */
++    public static final int STACKING_ACCORDION = 1;
++
++    /** A stack shows as one outlined tab; the active stack's other members fill a second row. */
++    public static final int STACKING_TWO_LEVEL = 2;
++
++    /** The narrowest and widest a tab may be made by the "Minimum tab width" slider, in dp. */
++    public static final int MIN_TAB_WIDTH_FLOOR_DP = 90;
++
++    public static final int MIN_TAB_WIDTH_CEILING_DP = 180;
++
++    /**
++     * The narrowest a tab may become before the strip starts scrolling, in dp. Defaults to
++     * Chromium's own minimum so the strip is unchanged until the slider is moved.
++     */
++    public static float minTabWidthDp(float stockMinimum) {
++        int stored =
++                ChromeSharedPreferences.getInstance()
++                        .readInt(ChromePreferenceKeys.FLAGS_MIN_TAB_WIDTH, 0);
++        if (stored <= 0) return stockMinimum;
++        return Math.max(MIN_TAB_WIDTH_FLOOR_DP, Math.min(MIN_TAB_WIDTH_CEILING_DP, stored));
++    }
++
++    /** The tab stacking presentation mode, one of the STACKING_* constants. */
++    public static int tabStackingMode() {
++        return ChromeSharedPreferences.getInstance()
++                .readInt(ChromePreferenceKeys.FLAGS_TAB_STACKING_MODE, STACKING_ACCORDION);
++    }
++
+     /**
+      * The colour shared by the strip background and its unselected tabs: the toolbar's own
+      * background, i.e. what the address bar sits in.
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTab.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutTab.java
+@@ -17,6 +17,7 @@ import android.util.FloatProperty;
+ import android.util.Size;
+ 
+ import androidx.annotation.ColorInt;
++import androidx.core.graphics.ColorUtils;
+ import androidx.annotation.ColorRes;
+ import androidx.annotation.DrawableRes;
+ import androidx.annotation.StringRes;
+@@ -730,7 +731,33 @@ public class StripLayoutTab extends Stri
+      *
+      * @return The tint color resource that represents the tab background.
+      */
++    /**
++     * Vivaldi-style selection: a selected (but not active) tab darkens its fill a little and gets
++     * a ring in its own colour made brighter -- blended toward the tab's text colour, so it is
++     * lighter on dark strips and darker on light ones and never disappears into a strip
++     * background of the same shade.
++     */
++    private static final float SELECTED_FILL_DARKEN = 0.15f;
++
++    private static final float SELECTION_RING_TOWARD_TEXT = 0.45f;
++
+     public @ColorInt int getTint() {
++        int base = getBaseTint();
++        if (TabSelections.contains(getTabId()) && !getIsSelected()) {
++            return ColorUtils.blendARGB(base, android.graphics.Color.BLACK, SELECTED_FILL_DARKEN);
++        }
++        return base;
++    }
++
++    /** The colour for the ring around this tab: its own colour, brightened toward its text. */
++    public @ColorInt int getSelectionRingColor() {
++        return ColorUtils.blendARGB(
++                getBaseTint(),
++                TabUiThemeUtil.getTabTextColor(mContext, isIncognito()),
++                SELECTION_RING_TOWARD_TEXT);
++    }
++
++    private @ColorInt int getBaseTint() {
+         switch (mVisualState) {
+             case VisualState.SELECTED_HOVERED:
+             case VisualState.SELECTED:
+@@ -742,10 +769,14 @@ public class StripLayoutTab extends Stri
+             case VisualState.NON_DRAG_REORDERING:
+                 return TabUiThemeUtil.getTabStripBackgroundColor(mContext, isIncognito());
+             case VisualState.MULTISELECT_HOVERED:
+-                return TabUiThemeUtil.getTabStripMultiSelectedHoveredTabColor(
+-                        mContext, isIncognito());
+             case VisualState.MULTISELECT:
+-                return TabUiThemeUtil.getTabStripMultiSelectedTabColor(mContext, isIncognito());
++                // Selection is shown as an outline around the tab (see
++                // StripLayoutHelper#shouldShowTabOutline), not by tinting the whole tab, so a
++                // multi-selected tab keeps whatever fill it would otherwise have.
++                if (StripLayoutOptions.darkTabStripEnabled()) {
++                    return StripLayoutOptions.getDarkStripColor(mContext, isIncognito());
++                }
++                return ChromeColors.getDefaultBgColor(mContext, isIncognito());
+             case VisualState.HOVERED:
+                 return TabUiThemeUtil.getHoveredTabContainerColor(mContext, isIncognito());
+             case VisualState.PLACEHOLDER:
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabContextMenuCoordinator.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabContextMenuCoordinator.java
+@@ -342,6 +342,24 @@ public class TabContextMenuCoordinator e
+                 }
+             } else if (menuId == R.id.add_to_new_tab_group) {
+                 addToNewTabGroupItemCallback(tabModel, tabs, tabGroupCreationCallback);
++            } else if (menuId == R.id.select_tab_menu_id) {
++                // The explicit selection is free to include or exclude the active tab; the model's
++                // own current-tab invariant is upheld inside syncToModel.
++                TabSelections.add(tabs);
++                TabSelections.syncToModel(tabModel);
++            } else if (menuId == R.id.add_tab_to_new_stack_menu_id) {
++                int stackId = TabStacks.createStack(tabs);
++                makeStackContiguous(
++                        tabModel,
++                        TabModelUtils.getTabsById(
++                                TabStacks.getTabsInStack(stackId),
++                                tabModel,
++                                /* allowClosing= */ false));
++                TabSelections.clear();
++                tabModel.clearMultiSelection(/* notifyObservers= */ true);
++            } else if (menuId == R.id.clear_tab_selection_menu_id) {
++                TabSelections.clear();
++                tabModel.clearMultiSelection(/* notifyObservers= */ true);
+             } else if (menuId == R.id.remove_from_tab_group) {
+                 removeFromTabGroupItemCallback(tabModel, tabs);
+             } else if (menuId == R.id.move_to_other_window_menu_id) {
+@@ -726,12 +744,22 @@ public class TabContextMenuCoordinator e
+                 itemList.add(createCloseTabsDirectionalItem(isIncognito));
+             }
+         }
++        itemList.add(buildMenuDivider(isIncognito));
++        itemList.add(createSelectTabItem(isIncognito));
++        if (StripLayoutOptions.tabStackingMode() != StripLayoutOptions.STACKING_DISABLED) {
++            itemList.add(createAddTabToNewStackItem(isIncognito));
++        }
++        if (!TabSelections.isEmpty()) itemList.add(createClearSelectionItem(isIncognito));
+     }
+ 
+     private void buildMenuActionItemsForMultipleTabs(
+             ModelList itemList, AnchorInfo anchorInfo, List<Tab> tabs, boolean isIncognito) {
+-        if (ChromeFeatureList.sAndroidContextMenuNewActions.isEnabled()) {
+-            itemList.add(createNewTabDirectionalItem(isIncognito));
++        // A multi-selection menu carries only actions that apply to the selection as a whole.
++        if (StripLayoutOptions.tabStackingMode() != StripLayoutOptions.STACKING_DISABLED) {
++            itemList.add(
++                    TabStacks.anyInStack(tabs)
++                            ? createAddTabsToStackItem(isIncognito)
++                            : createAddTabsToNewStackItem(isIncognito));
+         }
+         itemList.add(createMoveToTabGroupItem(tabs, isIncognito));
+         if (TabGroupUtils.isAnyTabInGroup(tabs)) {
+@@ -740,30 +768,12 @@ public class TabContextMenuCoordinator e
+         if (shouldShowMoveToWindowItem(tabs, anchorInfo)) {
+             itemList.add(createMoveToWindowItem(anchorInfo, isIncognito));
+         }
+-        List<ListItem> reorderItems = createReorderItems(anchorInfo, isIncognito);
+-        if (!reorderItems.isEmpty()) itemList.addAll(reorderItems);
+         itemList.add(buildMenuDivider(isIncognito));
+-        if (ChromeFeatureList.sAndroidContextMenuNewActions.isEnabled()) {
+-            itemList.add(createDuplicateTabsItem(isIncognito));
+-        }
+         itemList.add(createPinUnpinTabItem(tabs, isIncognito));
+         itemList.add(createMuteUnmuteSiteItem(tabs, isIncognito));
+-        if (ChromeFeatureList.sAndroidContextMenuNewActions.isEnabled()) {
+-            itemList.add(buildMenuDivider(isIncognito));
+-        }
+-        if (ChromeFeatureList.sAndroidContextMenuDisabledMenuItems.isEnabled() && !isIncognito) {
+-            itemList.add(createAddTabToReadingListItem(anchorInfo));
+-        }
+-        addVerticalTabsItems(itemList, isIncognito);
++        itemList.add(buildMenuDivider(isIncognito));
+         itemList.add(createCloseItem(isIncognito));
+-        if (ChromeFeatureList.sAndroidContextMenuNewActions.isEnabled()) {
+-            if (getTabModel().getCount() > anchorInfo.getAllTabIds().size()) {
+-                itemList.add(createCloseOtherTabsItem(isIncognito));
+-            }
+-            if (canCloseTabsToTheRight(anchorInfo)) {
+-                itemList.add(createCloseTabsDirectionalItem(isIncognito));
+-            }
+-        }
++        itemList.add(createClearSelectionItem(isIncognito));
+     }
+ 
+     private boolean shouldShowMoveToWindowItem(List<Tab> tabs, AnchorInfo anchorInfo) {
+@@ -1049,6 +1059,55 @@ public class TabContextMenuCoordinator e
+         return buildListItem(R.string.close, R.id.close_tab, isIncognito);
+     }
+ 
++    private ListItem createSelectTabItem(boolean isIncognito) {
++        return buildListItem(R.string.select_tab_menu_item, R.id.select_tab_menu_id, isIncognito);
++    }
++
++    private ListItem createAddTabToNewStackItem(boolean isIncognito) {
++        return buildListItem(
++                R.string.add_tab_to_new_stack_menu_item,
++                R.id.add_tab_to_new_stack_menu_id,
++                isIncognito);
++    }
++
++    /**
++     * Moves a new stack's members next to each other, in strip order, so the stack occupies one
++     * slot however its representative changes. Grouped tabs are left alone: moving them could
++     * split their group.
++     */
++    private static void makeStackContiguous(TabModel tabModel, List<Tab> tabs) {
++        if (tabs.size() < 2 || TabGroupUtils.isAnyTabInGroup(tabs)) return;
++        List<Tab> ordered = new ArrayList<>(tabs);
++        ordered.sort((a, b) -> Integer.compare(tabModel.indexOf(a), tabModel.indexOf(b)));
++        for (int i = 1; i < ordered.size(); i++) {
++            int target = tabModel.indexOf(ordered.get(i - 1)) + 1;
++            if (tabModel.indexOf(ordered.get(i)) != target) {
++                tabModel.moveTab(ordered.get(i).getId(), target);
++            }
++        }
++    }
++
++    private ListItem createClearSelectionItem(boolean isIncognito) {
++        return buildListItem(
++                R.string.clear_tab_selection_menu_item,
++                R.id.clear_tab_selection_menu_id,
++                isIncognito);
++    }
++
++    private ListItem createAddTabsToStackItem(boolean isIncognito) {
++        return buildListItem(
++                R.string.add_tabs_to_stack_menu_item,
++                R.id.add_tab_to_new_stack_menu_id,
++                isIncognito);
++    }
++
++    private ListItem createAddTabsToNewStackItem(boolean isIncognito) {
++        return buildListItem(
++                R.string.add_tabs_to_new_stack_menu_item,
++                R.id.add_tab_to_new_stack_menu_id,
++                isIncognito);
++    }
++
+     private ListItem createCloseAllTabsItem(boolean isIncognito) {
+         int stringRes =
+                 isIncognito ? R.string.menu_close_all_incognito_tabs : R.string.menu_close_all_tabs;
+--- /dev/null
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabSelections.java
+@@ -0,0 +1,81 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++package org.chromium.chrome.browser.compositor.overlays.strip;
++
++import org.chromium.build.annotations.NullMarked;
++import org.chromium.chrome.browser.tab.Tab;
++import org.chromium.chrome.browser.tabmodel.TabModel;
++import org.chromium.chrome.browser.tabmodel.TabModelUtils;
++
++import java.util.ArrayList;
++import java.util.HashSet;
++import java.util.LinkedHashSet;
++import java.util.List;
++import java.util.Set;
++
++/**
++ * The user's explicit tab selection: the tabs marked via "Select tab" or by tapping while a
++ * selection is active.
++ *
++ * <p>Kept separate from {@link TabModel}'s multi-selection because the model requires the current
++ * tab in every non-empty selection (TabCollectionTabModelImpl asserts it), while the user's marks
++ * must be free to include or exclude the active tab. {@link #syncToModel} keeps the model's set at
++ * (explicit + current) so the invariant holds; everything user-visible reads the explicit set.
++ */
++@NullMarked
++public class TabSelections {
++    private static final Set<Integer> sExplicit = new LinkedHashSet<>();
++
++    private TabSelections() {}
++
++    /** Returns whether no tab is explicitly selected. */
++    public static boolean isEmpty() {
++        return sExplicit.isEmpty();
++    }
++
++    /** Returns whether {@code tabId} is explicitly selected. */
++    public static boolean contains(int tabId) {
++        return sExplicit.contains(tabId);
++    }
++
++    /** Marks {@code tabs} as selected. */
++    public static void add(List<Tab> tabs) {
++        for (Tab tab : tabs) sExplicit.add(tab.getId());
++    }
++
++    /** Toggles {@code tabId}'s membership. */
++    public static void toggle(int tabId) {
++        if (!sExplicit.remove(tabId)) sExplicit.add(tabId);
++    }
++
++    /** Returns the selected tab ids, in selection order. */
++    public static List<Integer> getIds() {
++        return new ArrayList<>(sExplicit);
++    }
++
++    /** Forgets a closed tab. */
++    public static void remove(int tabId) {
++        sExplicit.remove(tabId);
++    }
++
++    /** Drops every mark. */
++    public static void clear() {
++        sExplicit.clear();
++    }
++
++    /** Mirrors the explicit set into {@code model}, keeping the model's own invariant intact. */
++    public static void syncToModel(TabModel model) {
++        sExplicit.removeIf(id -> model.getTabById(id) == null);
++        if (sExplicit.isEmpty()) {
++            model.clearMultiSelection(/* notifyObservers= */ true);
++            return;
++        }
++        Set<Integer> target = new HashSet<>(sExplicit);
++        int currentId = TabModelUtils.getCurrentTabId(model);
++        if (currentId != Tab.INVALID_TAB_ID) target.add(currentId);
++        model.clearMultiSelection(/* notifyObservers= */ false);
++        model.setTabsMultiSelected(target, /* isSelected= */ true);
++    }
++}
+--- /dev/null
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabStacks.java
+@@ -0,0 +1,190 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++package org.chromium.chrome.browser.compositor.overlays.strip;
++
++import org.chromium.build.annotations.NullMarked;
++import org.chromium.chrome.browser.tab.Tab;
++
++import java.util.ArrayList;
++import java.util.HashMap;
++import java.util.HashSet;
++import java.util.LinkedHashMap;
++import java.util.List;
++import java.util.Map;
++import java.util.Set;
++
++/**
++ * Tab stacks: several tabs collapsed behind a single entry in the tab strip, Vivaldi style.
++ *
++ * <p>Deliberately not built on tab groups. A collapsed group draws a coloured title chip rather
++ * than one of its tabs, so a group can never present as "the tab you were last looking at", which
++ * is the whole point of a stack. Tabs that are in a Chromium tab group are never stacked, so the
++ * two features cannot fight over one tab's collapse state.
++ *
++ * <p>Membership is a side table keyed on the tab id, which is stable for the life of the tab and
++ * stays comparable after the tab is gone -- unlike a strip index, which shifts on every reorder.
++ * Presentation is accordion-style: a collapsed stack shows only its representative in the strip;
++ * expanding fans the members back out inline. (Vivaldi's other modes -- Two Level's second row,
++ * Compact -- can layer on top of this same model later.)
++ */
++@NullMarked
++public class TabStacks {
++    /** Returned for tabs that are not in any stack. */
++    public static final int NO_STACK = 0;
++
++    // Insertion-ordered so a stack's first member is stable.
++    private static final Map<Integer, Integer> sTabIdToStackId = new LinkedHashMap<>();
++    private static final Set<Integer> sExpandedStacks = new HashSet<>();
++    // The member last active in each stack, so a stack keeps showing what was last looked at.
++    private static final Map<Integer, Integer> sLastActiveInStack = new HashMap<>();
++    private static int sNextStackId = 1;
++
++    private TabStacks() {}
++
++    /**
++     * A tab drawn a second time (a stack's second row) uses a mirror id: negative, and clear of
++     * {@link Tab#INVALID_TAB_ID}, so the compositor gives that copy its own layers and title.
++     */
++    private static final int MIRROR_ID_OFFSET = 2;
++
++    /** Returns the mirror id standing for {@code tabId}. */
++    public static int mirrorIdFor(int tabId) {
++        return -tabId - MIRROR_ID_OFFSET;
++    }
++
++    /** Returns whether {@code id} is a mirror id rather than a real tab id. */
++    public static boolean isMirrorId(int id) {
++        return id <= -MIRROR_ID_OFFSET;
++    }
++
++    /** Returns the real tab id behind a mirror id. */
++    public static int mirroredTabId(int mirrorId) {
++        return -mirrorId - MIRROR_ID_OFFSET;
++    }
++
++    /** Returns whether any stack exists at all; a cheap early-out for per-frame callers. */
++    public static boolean hasStacks() {
++        return !sTabIdToStackId.isEmpty();
++    }
++
++    /**
++     * Puts {@code tabs} into a newly created, collapsed stack, removing them from any stack they
++     * were in first -- a tab belongs to at most one stack, the same rule Chromium applies to
++     * splits.
++     *
++     * @return the id of the new stack, or {@link #NO_STACK} if there was nothing to stack.
++     */
++    public static int createStack(List<Tab> tabs) {
++        if (tabs.isEmpty()) return NO_STACK;
++        // If any of the tabs already belongs to a stack, the others join that stack instead of
++        // forming a second one -- selecting a stack's face and a lone tab means "add it".
++        int stackId = NO_STACK;
++        for (Tab tab : tabs) {
++            stackId = getStackForTab(tab.getId());
++            if (stackId != NO_STACK) break;
++        }
++        if (stackId == NO_STACK) stackId = sNextStackId++;
++        for (Tab tab : tabs) {
++            sTabIdToStackId.put(tab.getId(), stackId);
++        }
++        return stackId;
++    }
++
++    /** Returns whether any of {@code tabs} already belongs to a stack. */
++    public static boolean anyInStack(List<Tab> tabs) {
++        for (Tab tab : tabs) {
++            if (getStackForTab(tab.getId()) != NO_STACK) return true;
++        }
++        return false;
++    }
++
++    /** Returns the stack containing {@code tabId}, or {@link #NO_STACK}. */
++    public static int getStackForTab(int tabId) {
++        Integer stackId = sTabIdToStackId.get(tabId);
++        return stackId == null ? NO_STACK : stackId;
++    }
++
++    /** Returns the tab ids in {@code stackId}, in the order they were stacked. */
++    public static List<Integer> getTabsInStack(int stackId) {
++        List<Integer> tabIds = new ArrayList<>();
++        if (stackId == NO_STACK) return tabIds;
++        for (Map.Entry<Integer, Integer> entry : sTabIdToStackId.entrySet()) {
++            if (entry.getValue() == stackId) tabIds.add(entry.getKey());
++        }
++        return tabIds;
++    }
++
++    /** Returns whether {@code stackId} is collapsed (the default state). */
++    public static boolean isCollapsed(int stackId) {
++        return !sExpandedStacks.contains(stackId);
++    }
++
++    /** Collapses or expands {@code stackId}. */
++    public static void setCollapsed(int stackId, boolean collapsed) {
++        if (collapsed) {
++            sExpandedStacks.remove(stackId);
++        } else {
++            sExpandedStacks.add(stackId);
++        }
++    }
++
++    /**
++     * The tab standing in for {@code stackId} in the strip: its active member while the stack is
++     * active, otherwise its first member -- so the strip keeps showing whatever was last looked at
++     * inside the stack.
++     */
++    public static int representativeTab(int stackId, int activeTabId) {
++        List<Integer> members = getTabsInStack(stackId);
++        if (members.isEmpty()) return Tab.INVALID_TAB_ID;
++        if (members.contains(activeTabId)) {
++            sLastActiveInStack.put(stackId, activeTabId);
++            return activeTabId;
++        }
++        Integer lastActive = sLastActiveInStack.get(stackId);
++        if (lastActive != null && members.contains(lastActive)) return lastActive;
++        return members.get(0);
++    }
++
++    /** Returns whether stacking is enabled at all (any mode other than disabled). */
++    public static boolean stackingEnabled() {
++        return StripLayoutOptions.tabStackingMode() != StripLayoutOptions.STACKING_DISABLED;
++    }
++
++    /**
++     * Returns whether the strip should hide {@code tabId}: stacking is enabled, the tab belongs
++     * to a collapsed stack, and it is not the tab standing in for it.
++     */
++    public static boolean isHiddenByStack(int tabId, int activeTabId) {
++        if (!stackingEnabled()) return false;
++        int stackId = getStackForTab(tabId);
++        if (stackId == NO_STACK) return false;
++        // Two Level never fans a stack out in the main row: its members live in the row beneath.
++        boolean twoLevel =
++                StripLayoutOptions.tabStackingMode() == StripLayoutOptions.STACKING_TWO_LEVEL;
++        if (!twoLevel && !isCollapsed(stackId)) return false;
++        return tabId != representativeTab(stackId, activeTabId);
++    }
++
++    /** Returns whether {@code tabId} currently stands in for a stack of two or more tabs. */
++    public static boolean isRepresentative(int tabId, int activeTabId) {
++        if (!stackingEnabled()) return false;
++        int stackId = getStackForTab(tabId);
++        return stackId != NO_STACK
++                && getTabsInStack(stackId).size() >= 2
++                && representativeTab(stackId, activeTabId) == tabId;
++    }
++
++    /** Forgets a closed tab; a stack left with fewer than two members is dissolved. */
++    public static void removeTab(int tabId) {
++        Integer stackId = sTabIdToStackId.remove(tabId);
++        if (stackId == null) return;
++        List<Integer> remaining = getTabsInStack(stackId);
++        if (remaining.size() < 2) {
++            for (Integer id : remaining) sTabIdToStackId.remove(id);
++            sExpandedStacks.remove(stackId);
++            sLastActiveInStack.remove(stackId);
++        }
++    }
++}
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/scene_layer/TabStripSceneLayer.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/scene_layer/TabStripSceneLayer.java
+@@ -27,6 +27,7 @@ import org.chromium.chrome.browser.compo
+ import org.chromium.chrome.browser.compositor.layouts.components.TintedCompositorTextButton;
+ import org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutGroupTitle;
+ import org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutHelperManager;
++import org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutOptions;
+ import org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutTab;
+ import org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutTrailingButtonsCoordinator;
+ import org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutUtils;
+@@ -352,7 +353,8 @@ public class TabStripSceneLayer extends
+                         layoutHelper.getLeftFadeOpacity(),
+                         Math.round(layoutHelper.getLeftFadeGradientWidth() * mDpToPx),
+                         Math.round(layoutHelper.getLeftFadeOpaqueWidth() * mDpToPx),
+-                        leftPaddingPx);
++                        leftPaddingPx,
++                        Math.round(layoutHelper.getScrollableStripHeight() * mDpToPx));
+ 
+         TabStripSceneLayerJni.get()
+                 .updateTabStripFade(
+@@ -362,7 +364,8 @@ public class TabStripSceneLayer extends
+                         layoutHelper.getRightFadeOpacity(),
+                         Math.round(layoutHelper.getRightFadeGradientWidth() * mDpToPx),
+                         Math.round(layoutHelper.getRightFadeOpaqueWidth() * mDpToPx),
+-                        rightPaddingPx);
++                        rightPaddingPx,
++                        Math.round(layoutHelper.getScrollableStripHeight() * mDpToPx));
+     }
+ 
+     @VisibleForTesting
+@@ -384,11 +387,22 @@ public class TabStripSceneLayer extends
+             final StripLayoutTab st = stripTabs[i];
+             boolean isSelected = st.getTabId() == selectedTabId;
+             boolean shouldShowOutline = layoutHelper.shouldShowTabOutline(st);
++            boolean showSelectionRing = layoutHelper.shouldShowSelectionRing(st);
+             @DrawableRes
+             int focusBackground =
+                     isSelected && shouldShowOutline
+                             ? TabUiThemeUtil.getSelectedTabInTabGroupKeyboardFocusDrawableRes()
+                             : TabUiThemeUtil.getTabKeyboardFocusDrawableRes();
++            if (showSelectionRing && !st.isKeyboardFocused()) {
++                // The selection ring traces the tab, so its corner radius has to match the shape
++                // actually drawn: the detached (floating) body is ~10dp, the folio ~8dp, while the
++                // keyboard focus ring is 8dp nominal (6.25dp measured) and reads as a rectangle
++                // around a floating tab.
++                focusBackground =
++                        StripLayoutOptions.floatingTabsEnabled()
++                                ? TabUiThemeUtil.getTabGroupIndicatorKeyboardFocusDrawableRes()
++                                : TabUiThemeUtil.getSelectedTabInTabGroupKeyboardFocusDrawableRes();
++            }
+             TintedCompositorButton closeButton = st.getCloseButton();
+             @ColorInt int closeButtonTint = closeButton.getTint();
+ 
+@@ -448,9 +462,11 @@ public class TabStripSceneLayer extends
+                             st.isLoading(),
+                             st.getLoadingSpinnerRotation(),
+                             st.getContainerOpacity(),
+-                            st.isKeyboardFocused(),
++                            st.isKeyboardFocused() || showSelectionRing,
+                             focusBackground,
+-                            st.getKeyboardFocusRingColor(),
++                            showSelectionRing && !st.isKeyboardFocused()
++                                    ? st.getSelectionRingColor()
++                                    : st.getKeyboardFocusRingColor(),
+                             st.getKeyboardFocusRingOffset(),
+                             st.getLineWidth(),
+                             Math.round(FOLIO_FOOT_LENGTH_DP * mDpToPx),
+@@ -655,7 +671,8 @@ public class TabStripSceneLayer extends
+                 float opacity,
+                 float gradientWidthPx,
+                 float opaqueWidthPx,
+-                float paddingPx);
++                float paddingPx,
++                float scrollableHeightPx);
+ 
+         void putStripTabLayer(
+                 long nativeTabStripSceneLayer,
+--- a/chrome/android/java/src/org/chromium/chrome/browser/ntp/NewTabPage.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/ntp/NewTabPage.java
+@@ -808,7 +808,12 @@ public class NewTabPage
+      *     NTP.
+      */
+     public static boolean isInSingleUrlBarMode(boolean isLff) {
+-        return !isLff;
++        // Single url bar mode morphs the page's fake search box into the toolbar's omnibox. That
++        // belongs to the phone layout, where nothing sits above the toolbar. With the tab strip
++        // forced on, the page is laid out below a strip the morph does not account for, so the box
++        // and the logo are hidden at rest and the omnibox collapses. Tablets keep their fake box
++        // and simply focus the omnibox above; do the same whenever the strip is shown.
++        return !isLff && !DeviceFormFactor.isForceTabletUI();
+     }
+ 
+     /**
+--- a/chrome/android/java/src/org/chromium/chrome/browser/settings/ExperimentalTabsSettings.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/ExperimentalTabsSettings.java
+@@ -7,12 +7,16 @@ package org.chromium.chrome.browser.sett
+ import android.app.Activity;
+ import android.os.Bundle;
+ 
++import androidx.preference.ListPreference;
++import androidx.preference.SeekBarPreference;
++
+ import org.chromium.base.supplier.MonotonicObservableSupplier;
+ import org.chromium.base.supplier.ObservableSuppliers;
+ import org.chromium.base.supplier.SettableMonotonicObservableSupplier;
+ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.build.annotations.Nullable;
+ import org.chromium.chrome.R;
++import org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutOptions;
+ import org.chromium.chrome.browser.lifetime.ApplicationLifetime;
+ import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+ import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
+@@ -31,6 +35,8 @@ public class ExperimentalTabsSettings ex
+     static final String PREF_FLOATING_TABS = "floating_tabs_switch";
+     static final String PREF_BACKGROUND_TAB_CLOSE = "background_tab_close_switch";
+     static final String PREF_DARK_TAB_STRIP = "dark_tab_strip_switch";
++    static final String PREF_TAB_STACKING = "tab_stacking_pref";
++    static final String PREF_MIN_TAB_WIDTH = "min_tab_width_pref";
+ 
+     private final SettableMonotonicObservableSupplier<String> mPageTitle =
+             ObservableSuppliers.createMonotonic();
+@@ -50,6 +56,55 @@ public class ExperimentalTabsSettings ex
+                 false,
+                 false);
+         bind(PREF_DARK_TAB_STRIP, ChromePreferenceKeys.FLAGS_DARK_TAB_STRIP_ENABLED, false, false);
++        bindTabStackingMode();
++        bindMinTabWidth();
++    }
++
++    private void bindMinTabWidth() {
++        SeekBarPreference pref = findPreference(PREF_MIN_TAB_WIDTH);
++        if (pref == null) return;
++        int stored =
++                ChromeSharedPreferences.getInstance()
++                        .readInt(ChromePreferenceKeys.FLAGS_MIN_TAB_WIDTH, 0);
++        // 0 means "never set": show Chromium's own minimum as the starting point.
++        int value = stored > 0 ? stored : StripLayoutOptions.MIN_TAB_WIDTH_FLOOR_DP;
++        pref.setValue(
++                Math.max(
++                        StripLayoutOptions.MIN_TAB_WIDTH_FLOOR_DP,
++                        Math.min(StripLayoutOptions.MIN_TAB_WIDTH_CEILING_DP, value)));
++        pref.setOnPreferenceChangeListener(
++                (preference, newValue) -> {
++                    int width = (int) newValue;
++                    ChromeSharedPreferences.getInstance()
++                            .writeInt(ChromePreferenceKeys.FLAGS_MIN_TAB_WIDTH, width);
++                    return true;
++                });
++    }
++
++    private void bindTabStackingMode() {
++        ListPreference stackingPref = findPreference(PREF_TAB_STACKING);
++        if (stackingPref == null) return;
++        String[] entries = {
++            getString(R.string.tab_stacking_disabled),
++            getString(R.string.tab_stacking_accordion),
++            getString(R.string.tab_stacking_two_level)
++        };
++        stackingPref.setEntries(entries);
++        stackingPref.setEntryValues(new String[] {"0", "1", "2"});
++        int mode =
++                ChromeSharedPreferences.getInstance()
++                        .readInt(ChromePreferenceKeys.FLAGS_TAB_STACKING_MODE, 1);
++        if (mode < 0 || mode >= entries.length) mode = 1;
++        stackingPref.setValue(String.valueOf(mode));
++        stackingPref.setSummary(entries[mode]);
++        stackingPref.setOnPreferenceChangeListener(
++                (preference, newValue) -> {
++                    int newMode = Integer.parseInt((String) newValue);
++                    ChromeSharedPreferences.getInstance()
++                            .writeInt(ChromePreferenceKeys.FLAGS_TAB_STACKING_MODE, newMode);
++                    stackingPref.setSummary(entries[newMode]);
++                    return true;
++                });
+     }
+ 
+     private void bind(
+--- a/chrome/browser/android/compositor/layer_title_cache.cc
++++ b/chrome/browser/android/compositor/layer_title_cache.cc
+@@ -74,9 +74,10 @@ void LayerTitleCache::UpdateLayer(JNIEnv
+                                   bool is_rtl,
+                                   bool show_bubble) {
+   DecorationTabTitle* title_layer = layer_cache_.Lookup(tab_id);
++  bool valid = title_resource_id != ui::Resource::kInvalidResourceId &&
++               icon_resource_id != ui::Resource::kInvalidResourceId;
+   if (title_layer) {
+-    if (title_resource_id != ui::Resource::kInvalidResourceId &&
+-        icon_resource_id != ui::Resource::kInvalidResourceId) {
++    if (valid) {
+       title_layer->Update(title_resource_id, icon_resource_id, fade_width_,
+                           icon_start_padding_, icon_end_padding_, is_incognito,
+                           is_rtl, show_bubble);
+--- a/chrome/browser/android/compositor/layer_title_cache.h
++++ b/chrome/browser/android/compositor/layer_title_cache.h
+@@ -101,6 +101,7 @@ class LayerTitleCache {
+   virtual ~LayerTitleCache();
+ 
+   base::IDMap<std::unique_ptr<DecorationTabTitle>> layer_cache_;
++
+   std::unordered_map<tab_groups::TabGroupId,
+                      std::unique_ptr<DecorationIconTitle>,
+                      tab_groups::TabGroupIdHash>
+--- a/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
++++ b/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
+@@ -461,6 +461,8 @@ public final class ChromePreferenceKeys
+     public static final String FLAGS_BACKGROUND_TAB_CLOSE_ENABLED =
+             "background_tab_close_button_enabled";
+     public static final String FLAGS_DARK_TAB_STRIP_ENABLED = "dark_tab_strip_enabled";
++    public static final String FLAGS_TAB_STACKING_MODE = "tab_stacking_style";
++    public static final String FLAGS_MIN_TAB_WIDTH = "minimum_tab_width";
+ 
+     /** Keys used to save settings related to homepage. */
+     public static final String DEPRECATED_HOMEPAGE_CUSTOM_URI = "homepage_custom_uri";
+--- a/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/LegacyChromePreferenceKeys.java
++++ b/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/LegacyChromePreferenceKeys.java
+@@ -60,6 +60,8 @@ public class LegacyChromePreferenceKeys
+                 ChromePreferenceKeys.FLAGS_FLOATING_TABS_ENABLED,
+                 ChromePreferenceKeys.FLAGS_BACKGROUND_TAB_CLOSE_ENABLED,
+                 ChromePreferenceKeys.FLAGS_DARK_TAB_STRIP_ENABLED,
++                ChromePreferenceKeys.FLAGS_TAB_STACKING_MODE,
++                ChromePreferenceKeys.FLAGS_MIN_TAB_WIDTH,
+                 ChromePreferenceKeys.FIRST_RUN_SKIP_WELCOME_PAGE,
+                 ChromePreferenceKeys.HISTORY_SHOW_HISTORY_INFO,
+                 ChromePreferenceKeys.HOMEPAGE_ENABLED,
+--- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
++++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
+@@ -635,6 +635,39 @@ For more settings that use data to impro
+       <message name="IDS_EXPERIMENTAL_SECTION_TITLE" desc="Header of the settings section that holds experimental options.">
+         Experimental
+       </message>
++      <message name="IDS_SELECT_TAB_MENU_ITEM" desc="Tab strip context menu item that selects the tab, so further tabs can be added to the selection.">
++        Select tab
++      </message>
++      <message name="IDS_ADD_TAB_TO_NEW_STACK_MENU_ITEM" desc="Tab strip context menu item that collapses the tab into a newly created stack.">
++        Add tab to new stack
++      </message>
++      <message name="IDS_ADD_TABS_TO_NEW_STACK_MENU_ITEM" desc="Tab strip context menu item that collapses the selected tabs into a newly created stack.">
++        Add tabs to new stack
++      </message>
++      <message name="IDS_ADD_TABS_TO_STACK_MENU_ITEM" desc="Tab strip context menu item that adds the selected tabs to the stack one of them already belongs to.">
++        Add tabs to stack
++      </message>
++      <message name="IDS_CLEAR_TAB_SELECTION_MENU_ITEM" desc="Tab strip context menu item that deselects all selected tabs and leaves selection mode.">
++        Clear selection
++      </message>
++      <message name="IDS_TAB_STACK_TAB_COUNT" desc="Label shown on the tab strip entry that stands for a collapsed tab stack, giving the number of tabs it holds.">
++        <ph name="COUNT">%1$d<ex>3</ex></ph> tabs
++      </message>
++      <message name="IDS_MIN_TAB_WIDTH_TITLE" desc="Title of the preference setting the narrowest a tab may become in the tab strip, in density-independent pixels.">
++        Minimum tab width
++      </message>
++      <message name="IDS_TAB_STACKING_TITLE" desc="Title of the preference choosing how tab stacks are presented in the tab strip.">
++        Tab stacking
++      </message>
++      <message name="IDS_TAB_STACKING_DISABLED" desc="Tab stacking mode in which stacks are inert.">
++        Disabled
++      </message>
++      <message name="IDS_TAB_STACKING_ACCORDION" desc="Tab stacking mode in which a stack collapses behind one tab and expands inline.">
++        Accordion
++      </message>
++      <message name="IDS_TAB_STACKING_TWO_LEVEL" desc="Tab stacking mode in which the active stack's tabs are shown in a second row.">
++        Two Level
++      </message>
+       <message name="IDS_EXPERIMENTAL_TABS_TITLE" desc="Title of the settings page holding tab strip appearance options.">
+         Tabs
+       </message>
+--- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/top/tab_strip/HeightTransitionHandler.java
++++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/top/tab_strip/HeightTransitionHandler.java
+@@ -91,6 +91,7 @@ class HeightTransitionHandler {
+     private boolean mIsDestroyed;
+ 
+     private boolean mForceUpdateHeight;
++    private int mExtraHeight;
+     private boolean mUpdateStripVisibility;
+ 
+     /**
+@@ -317,8 +318,16 @@ class HeightTransitionHandler {
+     }
+ 
+     /** This may differ from |mTabStripHeight| when the transition is about to start. */
++    /** Requests {@code extraHeightPx} of strip height beyond the resource height; 0 restores it. */
++    void setExtraHeight(int extraHeightPx) {
++        if (mExtraHeight == extraHeightPx) return;
++        mExtraHeight = extraHeightPx;
++        mForceUpdateHeight = true;
++        requestTransition();
++    }
++
+     private int calculateTabStripHeight() {
+-        return mTabStripHeightFromResource + mTopPadding;
++        return mTabStripHeightFromResource + mTopPadding + mExtraHeight;
+     }
+ 
+     /**
+@@ -350,10 +359,14 @@ class HeightTransitionHandler {
+                         ? calculateTabStripHeight()
+                         : 0;
+ 
++        // The scrim only belongs to show/hide; a height change between two visible sizes (a
++        // second stack row appearing) re-lays out without one.
++        boolean applyScrimOverlay =
++                mUpdateStripVisibility && (newHeight == 0 || mTabStripHeight == 0);
+         mTabStripTransitionHandler.onTransitionRequested(
+                 newHeight,
+                 mTopPadding,
+-                mUpdateStripVisibility,
++                applyScrimOverlay,
+                 mTabStripSuppressed,
+                 () -> {
+                     // Acknowledge and record the new height when transition start signal.
+--- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/top/tab_strip/TabStripTransitionCoordinator.java
++++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/top/tab_strip/TabStripTransitionCoordinator.java
+@@ -147,6 +147,12 @@ public class TabStripTransitionCoordinat
+          * @param callback Callback to handle a fade transition threshold update.
+          */
+         default void setFadeTransitionThresholdChangedCallback(@Nullable Runnable callback) {}
++
++        /**
++         * Hands the delegate a callback through which it can request extra strip height, in px,
++         * beyond the resource height -- e.g. a second row for tab stacks. 0 restores the default.
++         */
++        default void setExtraHeightRequestCallback(@Nullable Callback<Integer> callback) {}
+     }
+ 
+     private final CallbackController mCallbackController = new CallbackController();
+@@ -256,6 +262,9 @@ public class TabStripTransitionCoordinat
+                             delegate.setFadeTransitionThresholdChangedCallback(
+                                     mCallbackController.makeCancelable(
+                                             this::updateTabStripTransitionThreshold));
++                            delegate.setExtraHeightRequestCallback(
++                                    mCallbackController.makeCancelable(
++                                            mHeightTransitionHandler::setExtraHeight));
+                         }));
+ 
+         AppHeaderState appHeaderState = null;
+@@ -337,6 +346,7 @@ public class TabStripTransitionCoordinat
+         TabStripTransitionDelegate delegate = mTabStripTransitionDelegateSupplier.get();
+         if (delegate != null) {
+             delegate.setFadeTransitionThresholdChangedCallback(null);
++            delegate.setExtraHeightRequestCallback(null);
+         }
+         mCallbackController.destroy();
+         mHeightTransitionHandler.destroy();
+--- a/third_party/androidx/androidx_preferences.flags
++++ b/third_party/androidx/androidx_preferences.flags
+@@ -15,6 +15,9 @@
+ -keep public class androidx.preference.PreferenceScreen {
+     public <init>(android.content.Context, android.util.AttributeSet);
+ }
++-keep public class androidx.preference.SeekBarPreference {
++    public <init>(android.content.Context, android.util.AttributeSet);
++}
+ 
+ # Referenced by androidx.preference.PreferenceInflater.
+ -keep public class androidx.preference.SwitchPreference {}
