@@ -1,0 +1,613 @@
+--- a/chrome/android/features/tab_ui/java/res/drawable/vertical_tabs_menu_collapse.xml
++++ b/chrome/android/features/tab_ui/java/res/drawable/vertical_tabs_menu_collapse.xml
+@@ -3,15 +3,19 @@
+ Copyright 2026 The Chromium Authors
+ Use of this source code is governed by a BSD-style license that can be
+ found in the LICENSE file.
++
++Ported from chrome/app/vector_icons/dock_to_left.icon so the rail toggle matches
++the desktop glyph. Square canvas: the panel is as tall as it is wide.
+ -->
+ <vector xmlns:android="http://schemas.android.com/apk/res/android"
+-    android:width="16dp"
+-    android:height="16dp"
+-    android:viewportWidth="24"
+-    android:viewportHeight="24"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="16"
++    android:viewportHeight="16"
+     android:tint="@macro/default_icon_color"
+     android:autoMirrored="true">
+   <path
+       android:fillColor="@android:color/white"
+-      android:pathData="M 4,18 a 0.96,0.96 0,0 1,-0.71,-0.29 A 0.96,0.96 0,0 1,3 17 c 0,-0.28 0.1,-0.52 0.29,-0.71 A 0.96,0.96 0,0 1,4 16 h 11 c 0.28,0 0.52,0.1 0.71,0.29 c 0.19,0.19 0.29,0.43 0.29,0.71 c 0,0.28 -0.1,0.52 -0.29,0.71 A 0.96,0.96 0,0 1,15 18 z m 14.9,-1.7 l -3.6,-3.6 a 0.96,0.96 0,0 1,0,-1.4 l 3.6,-3.6 a 0.95,0.95 0,0 1,0.7,-0.27 c 0.28,0 0.52,0.09 0.7,0.27 a 0.95,0.95 0,0 1,0.27,0.7 a 0.95,0.95 0,0 1,-0.27,0.7 L 17.4,12 l 2.9,2.9 a 0.95,0.95 0,0 1,0.27,0.7 c 0,0.28 -0.09,0.52 -0.27,0.7 a 0.95,0.95 0,0 1,-0.7,0.27 a 0.95,0.95 0,0 1,-0.7,-0.27 z M 4,13 a 0.96,0.96 0,0 1,-0.71,-0.29 A 0.96,0.96 0,0 1,3 12 c 0,-0.28 0.1,-0.52 0.29,-0.71 A 0.96,0.96 0,0 1,4 11 h 8 c 0.28,0 0.52,0.1 0.71,0.29 c 0.19,0.19 0.29,0.43 0.29,0.71 c 0,0.28 -0.1,0.52 -0.29,0.71 A 0.96,0.96 0,0 1,12 13 z m 0,-5 a 0.96,0.96 0,0 1,-0.71,-0.29 A 0.96,0.96 0,0 1,3 7 c 0,-0.28 0.1,-0.52 0.29,-0.71 A 0.96,0.96 0,0 1,4 6 h 11 c 0.28,0 0.52,0.1 0.71,0.29 c 0.19,0.19 0.29,0.43 0.29,0.71 c 0,0.28 -0.1,0.52 -0.29,0.71 A 0.96,0.96 0,0 1,15 8 z" />
++      android:fillType="nonZero"
++      android:pathData="M3.57,13.73 a1.25,1.25 0 0 1 -0.92,-0.38 a1.25,1.25 0 0 1 -0.38,-0.92 V3.57 c0,-0.36 0.13,-0.67 0.38,-0.92 a1.25,1.25 0 0 1 0.92,-0.38 h8.87 c0.36,0 0.67,0.13 0.92,0.38 c0.25,0.25 0.38,0.56 0.38,0.92 v8.87 c0,0.36 -0.13,0.67 -0.38,0.92 a1.25,1.25 0 0 1 -0.92,0.38 Z m6.87,-1.38 h1.92 V3.65 h-1.92 Z m-1.39,0 V3.65 H3.65 v8.7 Z m1.39,0 h1.92 Z" />
+ </vector>
+--- a/chrome/android/features/tab_ui/java/res/drawable/vertical_tabs_menu_expand.xml
++++ b/chrome/android/features/tab_ui/java/res/drawable/vertical_tabs_menu_expand.xml
+@@ -3,15 +3,19 @@
+ Copyright 2026 The Chromium Authors
+ Use of this source code is governed by a BSD-style license that can be
+ found in the LICENSE file.
++
++Ported from chrome/app/vector_icons/dock_to_left.icon so the rail toggle matches
++the desktop glyph. Square canvas: the panel is as tall as it is wide.
+ -->
+ <vector xmlns:android="http://schemas.android.com/apk/res/android"
+-    android:width="16dp"
+-    android:height="16dp"
+-    android:viewportWidth="24"
+-    android:viewportHeight="24"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="16"
++    android:viewportHeight="16"
+     android:tint="@macro/default_icon_color"
+     android:autoMirrored="true">
+   <path
+       android:fillColor="@android:color/white"
+-      android:pathData="M 21,18 L 21,16 L 8,16 L 8,18 Z M 4.4,17 L 9.4,12 L 4.4,7 L 3,8.4 L 6.6,12 L 3,15.6 Z M 21,13 L 21,11 L 11,11 L 11,13 Z M 21,8 L 21,6 L 8,6 L 8,8 Z" />
++      android:fillType="nonZero"
++      android:pathData="M3.57,13.73 a1.25,1.25 0 0 1 -0.92,-0.38 a1.25,1.25 0 0 1 -0.38,-0.92 V3.57 c0,-0.36 0.13,-0.67 0.38,-0.92 a1.25,1.25 0 0 1 0.92,-0.38 h8.87 c0.36,0 0.67,0.13 0.92,0.38 c0.25,0.25 0.38,0.56 0.38,0.92 v8.87 c0,0.36 -0.13,0.67 -0.38,0.92 a1.25,1.25 0 0 1 -0.92,0.38 Z m6.87,-1.38 h1.92 V3.65 h-1.92 Z m-1.39,0 V3.65 H3.65 v8.7 Z m1.39,0 h1.92 Z" />
+ </vector>
+--- a/chrome/android/features/tab_ui/java/res/layout/vertical_tab_layout.xml
++++ b/chrome/android/features/tab_ui/java/res/layout/vertical_tab_layout.xml
+@@ -32,7 +32,8 @@ found in the LICENSE file.
+         android:layout_gravity="start"
+         android:layout_marginVertical="@dimen/vertical_tabs_header_margin_vertical"
+         app:layout_constraintTop_toBottomOf="@id/desktop_window_spacer"
+-        android:paddingVertical="@dimen/vertical_tabs_header_padding_vertical">
++        android:paddingVertical="@dimen/vertical_tabs_header_padding_vertical"
++        android:visibility="gone">
+         <ImageButton
+             android:id="@+id/collapse_button"
+             android:layout_width="@dimen/vertical_tabs_header_button_size"
+@@ -40,7 +41,7 @@ found in the LICENSE file.
+             android:src="@drawable/vertical_tabs_menu_collapse"
+             android:background="?attr/selectableItemBackgroundBorderless"
+             android:contentDescription="@string/accessibility_collapse_vertical_tabs"
+-            android:scaleType="center"
++            android:scaleType="fitCenter"
+             android:padding="@dimen/vertical_tabs_header_button_padding"
+             android:layout_marginEnd="@dimen/vertical_tabs_header_button_collapsed_margin_end"
+             android:visibility="visible" />
+@@ -57,9 +58,10 @@ found in the LICENSE file.
+             android:src="@drawable/ic_grid_view_16dp"
+             android:background="@drawable/vertical_tabs_left_rounded_button_background"
+             android:contentDescription="@string/accessibility_tab_groups"
+-            android:scaleType="center"
++            android:scaleType="fitCenter"
+             android:padding="@dimen/vertical_tabs_header_button_padding"
+-            android:layout_marginEnd="@dimen/vertical_tabs_header_button_gap"/>
++            android:layout_marginEnd="@dimen/vertical_tabs_header_button_gap"
++            android:visibility="gone" />
+         <ImageButton
+             android:id="@+id/tab_search_button"
+             android:layout_width="@dimen/vertical_tabs_header_button_size"
+@@ -67,8 +69,9 @@ found in the LICENSE file.
+             android:src="@drawable/ic_manage_search_16dp"
+             android:background="@drawable/vertical_tabs_right_rounded_button_background"
+             android:contentDescription="@string/accessibility_search_loupe_tooltip_text"
+-            android:scaleType="center"
+-            android:padding="@dimen/vertical_tabs_header_button_padding"/>
++            android:scaleType="fitCenter"
++            android:padding="@dimen/vertical_tabs_header_button_padding"
++            android:visibility="gone" />
+     </LinearLayout>
+ 
+     <!-- Pinned Tabs Recycler View -->
+--- a/chrome/android/features/tab_ui/java/res/values/dimens.xml
++++ b/chrome/android/features/tab_ui/java/res/values/dimens.xml
+@@ -203,7 +203,7 @@ found in the LICENSE file.
+     <dimen name="vertical_tabs_scrollbar_padding_end">9dp</dimen>
+     <dimen name="vertical_tabs_scrollbar_width">3dp</dimen>
+     <dimen name="vertical_tabs_scrollbar_radius">100dp</dimen>
+-    <dimen name="vertical_tab_item_icon_size">16dp</dimen>
++    <dimen name="vertical_tab_item_icon_size">24dp</dimen>
+     <dimen name="vertical_tab_item_loading_spinner_thickness">2dp</dimen>
+     <dimen name="vertical_tab_item_padding_horizontal">8dp</dimen>
+     <dimen name="vertical_tab_item_padding_vertical">6dp</dimen>
+--- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabListViewBinder.java
++++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabListViewBinder.java
+@@ -15,6 +15,7 @@ import androidx.core.widget.ImageViewCom
+ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.build.annotations.Nullable;
+ import org.chromium.chrome.browser.incognito.IncognitoUtils;
++import org.chromium.components.browser_ui.styles.ChromeColors;
+ import org.chromium.chrome.browser.tasks.tab_management.TabUiThemeUtil;
+ import org.chromium.chrome.browser.ui.vertical_tabs.VerticalTabUtils;
+ import org.chromium.chrome.tab_ui.R;
+@@ -87,7 +88,9 @@ public class VerticalTabListViewBinder {
+             return;
+         }
+         Context context = view.getContext();
+-        int backgroundColor = TabUiThemeUtil.getTabStripBackgroundColor(context, isIncognito);
++        // The rail sits beside the page, not above it, so the tab strip's own grey reads as a
++        // separate panel. Use the window's background instead, matching the toolbar and page.
++        int backgroundColor = ChromeColors.getDefaultThemeColor(context, isIncognito);
+         view.setBackgroundColor(backgroundColor);
+ 
+         ColorStateList iconTint =
+--- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabRailLayout.java
++++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabRailLayout.java
+@@ -189,6 +189,13 @@ public class VerticalTabRailLayout exten
+         boolean isManuallyExpanded = railCollapseState == RailCollapseState.EXPANDED;
+         Resources res = getResources();
+ 
++        // Collapsed means the tabs go away, not that the rail shrinks around them: hide the
++        // lists and leave the toggle behind so they can be brought back.
++        mRecyclerView.setVisibility(isCollapsed ? GONE : VISIBLE);
++        if (mPinnedTabsRecyclerView != null) {
++            mPinnedTabsRecyclerView.setVisibility(isCollapsed ? GONE : VISIBLE);
++        }
++
+         mHeaderContainer.setOrientation(
+                 isCollapsed ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
+         mHeaderContainer.setGravity(isCollapsed ? Gravity.CENTER_HORIZONTAL : Gravity.NO_GRAVITY);
+@@ -204,10 +211,8 @@ public class VerticalTabRailLayout exten
+                         ? res.getDimensionPixelOffset(R.dimen.vertical_tabs_header_padding_vertical)
+                         : 0;
+         mCollapseButton.setLayoutParams(collapseParams);
+-        mCollapseButton.setImageResource(
+-                isManuallyExpanded
+-                        ? R.drawable.vertical_tabs_menu_collapse
+-                        : R.drawable.vertical_tabs_menu_expand);
++        // One glyph for both states: the button reads as "tabs" whichever way it will act.
++        mCollapseButton.setImageResource(R.drawable.vertical_tabs_menu_expand);
+         int resId =
+                 isManuallyExpanded
+                         ? R.string.accessibility_collapse_vertical_tabs
+--- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabsSideUiCoordinator.java
++++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabsSideUiCoordinator.java
+@@ -46,7 +46,7 @@ import java.util.List;
+  */
+ @NullMarked
+ public class VerticalTabsSideUiCoordinator implements SideUiContainer, SideUiObserver {
+-    static final int VIEW_WIDTH_DP = VerticalTabUtils.SIDE_UI_CONTAINER_WIDTH_DP;
++    static final int VIEW_WIDTH_DP = VerticalTabUtils.railWidthDp();
+     static final int COLLAPSED_WIDTH_DP = VerticalTabUtils.SIDE_UI_CONTAINER_COLLAPSED_WIDTH_DP;
+ 
+     private final SideUiCoordinator mSideUiCoordinator;
+@@ -139,6 +139,11 @@ public class VerticalTabsSideUiCoordinat
+         return SideUiId.VERTICAL_TABS;
+     }
+ 
++    /** Brings the rail's tabs in or out; used by the toolbar button. */
++    public void toggleRail() {
++        mCollapseController.toggleCollapseState();
++    }
++
+     @Override
+     public SideUiSize determineShowableSize(
+             @Px int availableWidth, @Px int windowWidth, boolean isFullscreen) {
+@@ -152,9 +157,11 @@ public class VerticalTabsSideUiCoordinat
+                         : mExpandedViewWidth;
+         boolean shouldHide = availableWidth < targetWidth;
+         updateAutoHiddenState(mManualVisible && shouldHide);
++        // WEB_CONTENTS keeps the rail under the top controls, so collapsing and expanding it
++        // moves only the page -- the toolbar and its address bar stay full width.
+         return shouldHide
+                 ? new SideUiSize(0, HeightType.NOT_APPLICABLE)
+-                : new SideUiSize(targetWidth, HeightType.TOOLBAR);
++                : new SideUiSize(targetWidth, HeightType.WEB_CONTENTS);
+     }
+ 
+     private void updateAutoHiddenState(boolean isHiddenDueToNarrowWidth) {
+--- a/chrome/android/java/res/xml/experimental_tabs_preferences.xml
++++ b/chrome/android/java/res/xml/experimental_tabs_preferences.xml
+@@ -22,6 +22,20 @@ found in the LICENSE file.
+         android:dependency="floating_tabs_switch"
+         android:key="dark_tab_strip_switch"
+         android:title="@string/dark_tab_strip_title"/>
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:key="vertical_tabs_switch"
++        android:title="@string/vertical_tabs_title"/>
++    <SeekBarPreference
++        android:key="vertical_tabs_width_pref"
++        android:dependency="vertical_tabs_switch"
++        android:layout="@layout/preference_widget_seekbar_material"
++        android:max="320"
++        android:persistent="false"
++        android:title="@string/vertical_tabs_width_title"
++        app:min="100"
++        app:seekBarIncrement="10"
++        app:showSeekBarValue="true"
++        app:updatesContinuously="true"/>
+     <SeekBarPreference
+         android:key="min_tab_width_pref"
+         android:layout="@layout/preference_widget_seekbar_material"
+--- a/chrome/android/java/src/org/chromium/chrome/browser/settings/ExperimentalTabsSettings.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/ExperimentalTabsSettings.java
+@@ -20,6 +20,7 @@ import org.chromium.chrome.browser.compo
+ import org.chromium.chrome.browser.lifetime.ApplicationLifetime;
+ import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+ import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
++import org.chromium.chrome.browser.ui.vertical_tabs.VerticalTabUtils;
+ import org.chromium.chrome.browser.ui.messages.snackbar.Snackbar;
+ import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
+ import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager.SnackbarManageable;
+@@ -37,6 +38,8 @@ public class ExperimentalTabsSettings ex
+     static final String PREF_DARK_TAB_STRIP = "dark_tab_strip_switch";
+     static final String PREF_TAB_STACKING = "tab_stacking_pref";
+     static final String PREF_MIN_TAB_WIDTH = "min_tab_width_pref";
++    static final String PREF_VERTICAL_TABS = "vertical_tabs_switch";
++    static final String PREF_VERTICAL_TABS_WIDTH = "vertical_tabs_width_pref";
+ 
+     private final SettableMonotonicObservableSupplier<String> mPageTitle =
+             ObservableSuppliers.createMonotonic();
+@@ -58,6 +61,30 @@ public class ExperimentalTabsSettings ex
+         bind(PREF_DARK_TAB_STRIP, ChromePreferenceKeys.FLAGS_DARK_TAB_STRIP_ENABLED, false, false);
+         bindTabStackingMode();
+         bindMinTabWidth();
++        // Vertical tabs replace the strip with a rail beside the page; the layout is chosen when
++        // the activity builds its UI, so the change takes a relaunch.
++        bind(PREF_VERTICAL_TABS, ChromePreferenceKeys.VERTICAL_TABS_ENABLED, false, true);
++        bindVerticalTabsWidth();
++    }
++
++    private void bindVerticalTabsWidth() {
++        SeekBarPreference pref = findPreference(PREF_VERTICAL_TABS_WIDTH);
++        if (pref == null) return;
++        int stored =
++                ChromeSharedPreferences.getInstance()
++                        .readInt(ChromePreferenceKeys.VERTICAL_TABS_WIDTH, 0);
++        int value = stored > 0 ? stored : VerticalTabUtils.RAIL_WIDTH_DEFAULT_DP;
++        pref.setValue(
++                Math.max(
++                        VerticalTabUtils.RAIL_WIDTH_MIN_DP,
++                        Math.min(VerticalTabUtils.RAIL_WIDTH_MAX_DP, value)));
++        pref.setOnPreferenceChangeListener(
++                (preference, newValue) -> {
++                    ChromeSharedPreferences.getInstance()
++                            .writeInt(ChromePreferenceKeys.VERTICAL_TABS_WIDTH, (int) newValue);
++                    showRelaunchSnackbar();
++                    return true;
++                });
+     }
+ 
+     private void bindMinTabWidth() {
+--- a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java
+@@ -2384,6 +2384,19 @@ public class TabbedRootUiCoordinator ext
+                                     mUndoGroupSnackbarController),
+                             mIsVerticalTabsActiveSupplier);
+             mSideUiCoordinator.registerSideUiContainer(mVerticalTabsSideUiCoordinator);
++
++            // The rail disappears entirely when collapsed, so the control that brings it back
++            // lives in the toolbar rather than inside the rail.
++            View verticalTabsButton = mActivity.findViewById(R.id.vertical_tabs_button);
++            if (verticalTabsButton != null && VerticalTabUtils.isVerticalTabsEnabled(mActivity)) {
++                verticalTabsButton.setOnClickListener(
++                        v -> {
++                            if (mVerticalTabsSideUiCoordinator != null) {
++                                mVerticalTabsSideUiCoordinator.toggleRail();
++                            }
++                        });
++                verticalTabsButton.setVisibility(View.VISIBLE);
++            }
+             if (mToolbarManager != null) {
+                 mToolbarManager.setVerticalTabsAutoHiddenSupplier(
+                         mVerticalTabsSideUiCoordinator.getIsAutoHiddenSupplier());
+--- a/chrome/browser/flags/android/chrome_feature_list.cc
++++ b/chrome/browser/flags/android/chrome_feature_list.cc
+@@ -635,7 +635,7 @@ BASE_FEATURE(kAndroidTabstripStartupCapt
+ BASE_FEATURE(kAndroidThemeModule, base::FEATURE_ENABLED_BY_DEFAULT);
+ BASE_FEATURE(kAndroidThemeResourceProvider, base::FEATURE_DISABLED_BY_DEFAULT);
+ BASE_FEATURE(kAndroidToolbarScrollAblation, base::FEATURE_DISABLED_BY_DEFAULT);
+-BASE_FEATURE(kAndroidVerticalTabs, base::FEATURE_DISABLED_BY_DEFAULT);
++BASE_FEATURE(kAndroidVerticalTabs, base::FEATURE_ENABLED_BY_DEFAULT);
+ BASE_FEATURE(kAndroidXRUsesSurfaceControl, base::FEATURE_ENABLED_BY_DEFAULT);
+ BASE_FEATURE(kAndroidXrImmersivePlayer, base::FEATURE_DISABLED_BY_DEFAULT);
+ BASE_FEATURE(kAndroidZoomImmersive, base::FEATURE_DISABLED_BY_DEFAULT);
+--- a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
++++ b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
+@@ -821,7 +821,7 @@ public abstract class ChromeFeatureList
+     public static final CachedFlag sAndroidVerticalTabs =
+             newCachedFlag(
+                     ANDROID_VERTICAL_TABS,
+-                    /* defaultValue= */ false,
++                    /* defaultValue= */ true,
+                     /* defaultValueInTests= */ true);
+     public static final CachedFlag sAndroidWindowManagementWebApi =
+             newCachedFlag(
+--- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
++++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
+@@ -653,6 +653,12 @@ For more settings that use data to impro
+       <message name="IDS_TAB_STACK_TAB_COUNT" desc="Label shown on the tab strip entry that stands for a collapsed tab stack, giving the number of tabs it holds.">
+         <ph name="COUNT">%1$d<ex>3</ex></ph> tabs
+       </message>
++      <message name="IDS_VERTICAL_TABS_WIDTH_TITLE" desc="Title of the preference setting how wide the vertical tab rail is, in density-independent pixels.">
++        Vertical tab width
++      </message>
++      <message name="IDS_VERTICAL_TABS_TITLE" desc="Title of the preference that shows the tabs in a vertical rail beside the page instead of a strip above it.">
++        Vertical tabs
++      </message>
+       <message name="IDS_MIN_TAB_WIDTH_TITLE" desc="Title of the preference setting the narrowest a tab may become in the tab strip, in density-independent pixels.">
+         Minimum tab width
+       </message>
+--- a/chrome/browser/ui/android/toolbar/java/res/layout/toolbar_phone.xml
++++ b/chrome/browser/ui/android/toolbar/java/res/layout/toolbar_phone.xml
+@@ -14,6 +14,17 @@ found in the LICENSE file.
+     android:layout_height="@dimen/toolbar_height_no_shadow"
+     android:minHeight="@dimen/toolbar_height_no_shadow">
+ 
++    <ImageButton
++        android:id="@+id/vertical_tabs_button"
++        style="@style/ToolbarHoverableButton"
++        android:layout_width="@dimen/vertical_tabs_button_width"
++        android:layout_gravity="top|start"
++        android:src="@drawable/vertical_tabs_menu_expand"
++        android:contentDescription="@string/accessibility_expand_vertical_tabs"
++        android:tooltipText="@string/accessibility_expand_vertical_tabs"
++        android:visibility="gone"
++        app:tint="@color/default_icon_color_tint_list"/>
++
+     <org.chromium.chrome.browser.toolbar.home_button.HomeButton
+         android:id="@+id/home_button"
+         style="@style/ToolbarHoverableButton"
+--- a/chrome/browser/ui/android/toolbar/java/res/values/dimens.xml
++++ b/chrome/browser/ui/android/toolbar/java/res/values/dimens.xml
+@@ -109,4 +109,5 @@ found in the LICENSE file.
+     <dimen name="extension_action_hover_card_width" tools:ignore="UnusedResources">270dp</dimen>
+     <dimen name="extension_action_hover_card_horizontal_padding" tools:ignore="UnusedResources">16dp</dimen>
+     <dimen name="extension_action_hover_card_vertical_padding" tools:ignore="UnusedResources">12dp</dimen>
++    <dimen name="vertical_tabs_button_width">48dp</dimen>
+ </resources>
+--- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/top/ToolbarPhone.java
++++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/top/ToolbarPhone.java
+@@ -166,6 +166,8 @@ public class ToolbarPhone extends Toolba
+     private @MonotonicNonNull OptionalButtonCoordinator mOptionalButtonCoordinator;
+     // Non-null after inflation occurs.
+     private ImageView mHomeButton;
++    private @Nullable View mVerticalTabsButton;
++    private boolean mVerticalTabsButtonOffsetApplied;
+     private View mToolbarBackButton;
+     private @Nullable BackButtonCoordinator mBackButtonCoordinator;
+ 
+@@ -378,6 +380,7 @@ public class ToolbarPhone extends Toolba
+ 
+             mToolbarButtonsContainer = findViewById(R.id.toolbar_buttons);
+             mHomeButton = findViewById(R.id.home_button);
++            mVerticalTabsButton = findViewById(R.id.vertical_tabs_button);
+             mToolbarBackButton = findViewById(R.id.back_button);
+ 
+             mToolbarBackground =
+@@ -707,6 +710,7 @@ public class ToolbarPhone extends Toolba
+             super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+             return;
+         }
++        updateVerticalTabsButtonOffset();
+         if (!mDisableLocationBarRelayout) {
+             super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+ 
+@@ -860,22 +864,51 @@ public class ToolbarPhone extends Toolba
+     /**
+      * @return The left bounds of the location bar after accounting for any visible left buttons.
+      */
++    private int getVerticalTabsButtonWidth() {
++        if (mVerticalTabsButton == null || mVerticalTabsButton.getVisibility() == GONE) {
++            return 0;
++        }
++        return getResources().getDimensionPixelSize(R.dimen.vertical_tabs_button_width);
++    }
++
++    /**
++     * Keeps the home and back buttons clear of the vertical tabs toggle, which occupies the
++     * leading edge of the toolbar whenever it is showing.
++     */
++    private void updateVerticalTabsButtonOffset() {
++        int margin = getVerticalTabsButtonWidth();
++        boolean shouldOffset = margin != 0;
++        if (shouldOffset == mVerticalTabsButtonOffsetApplied) return;
++        mVerticalTabsButtonOffsetApplied = shouldOffset;
++
++        View[] leadingButtons = {mHomeButton, mToolbarBackButton};
++        for (View button : leadingButtons) {
++            if (button == null) continue;
++            ViewGroup.LayoutParams params = button.getLayoutParams();
++            if (!(params instanceof ViewGroup.MarginLayoutParams)) continue;
++            ViewGroup.MarginLayoutParams marginParams = (ViewGroup.MarginLayoutParams) params;
++            marginParams.setMarginStart(margin);
++            button.setLayoutParams(marginParams);
++        }
++    }
++
+     private int getBoundsAfterAccountingForLeftButton() {
+         int padding = mToolbarSidePaddingForNtp;
++        int verticalTabsButtonWidth = getVerticalTabsButtonWidth();
+ 
+         assert mHomeButton.getVisibility() == GONE || mToolbarBackButton.getVisibility() == GONE;
+ 
+         // If home button is visible, mHomeButton.getMeasuredWidth() should be returned as the left
+         // bound.
+         if (mHomeButton.getVisibility() != GONE) {
+-            padding = mHomeButton.getMeasuredWidth();
++            padding = verticalTabsButtonWidth + mHomeButton.getMeasuredWidth();
+         }
+         if (mToolbarBackButton.getVisibility() != GONE) {
+-            int buttonWidth = mToolbarBackButton.getMeasuredWidth();
++            int buttonWidth = verticalTabsButtonWidth + mToolbarBackButton.getMeasuredWidth();
+             padding = Math.max(padding, buttonWidth);
+         }
+ 
+-        return padding;
++        return Math.max(padding, verticalTabsButtonWidth);
+     }
+ 
+     /**
+@@ -1497,6 +1530,7 @@ public class ToolbarPhone extends Toolba
+         if (!mUrlFocusChangeInProgress) {
+             mToolbarButtonsContainer.setTranslationY(0);
+             mHomeButton.setTranslationY(0);
++            if (mVerticalTabsButton != null) mVerticalTabsButton.setTranslationY(0);
+         }
+ 
+         if (!mUrlFocusChangeInProgress && getToolbarHairline() != null) {
+@@ -1634,6 +1668,7 @@ public class ToolbarPhone extends Toolba
+ 
+         mToolbarButtonsContainer.setTranslationY(transY);
+         mHomeButton.setTranslationY(transY);
++        if (mVerticalTabsButton != null) mVerticalTabsButton.setTranslationY(transY);
+     }
+ 
+     private void setAncestorsShouldClipChildren(boolean clip) {
+@@ -1655,6 +1690,10 @@ public class ToolbarPhone extends Toolba
+             drawChild(canvas, mHomeButton, SystemClock.uptimeMillis());
+         }
+ 
++        if (mVerticalTabsButton != null && mVerticalTabsButton.getVisibility() != GONE) {
++            drawChild(canvas, mVerticalTabsButton, SystemClock.uptimeMillis());
++        }
++
+         if (mBackButtonCoordinator != null && mBackButtonCoordinator.isVisible()) {
+             drawChild(canvas, mToolbarBackButton, SystemClock.uptimeMillis());
+         }
+@@ -1776,7 +1815,8 @@ public class ToolbarPhone extends Toolba
+     }
+ 
+     private boolean isChildLeft(View child) {
+-        return (child == mHomeButton) ^ LocalizationUtils.isLayoutRtl();
++        return (child == mHomeButton || child == mVerticalTabsButton)
++                ^ LocalizationUtils.isLayoutRtl();
+     }
+ 
+     /**
+@@ -2331,6 +2371,17 @@ public class ToolbarPhone extends Toolba
+         animator.setInterpolator(Interpolators.FAST_OUT_LINEAR_IN_INTERPOLATOR);
+         animators.add(animator);
+ 
++        if (mVerticalTabsButton != null) {
++            animator =
++                    ObjectAnimator.ofFloat(
++                            mVerticalTabsButton,
++                            TRANSLATION_X,
++                            MathUtils.flipSignIf(-mVerticalTabsButton.getWidth() * density, isRtl));
++            animator.setDuration(toolbarButtonFadeDuration);
++            animator.setInterpolator(Interpolators.FAST_OUT_LINEAR_IN_INTERPOLATOR);
++            animators.add(animator);
++        }
++
+         if (getTabSwitcherButtonCoordinator() != null) {
+             animator =
+                     ObjectAnimator.ofFloat(
+@@ -2374,6 +2425,13 @@ public class ToolbarPhone extends Toolba
+         animator.setInterpolator(Interpolators.FAST_OUT_LINEAR_IN_INTERPOLATOR);
+         animators.add(animator);
+ 
++        if (mVerticalTabsButton != null) {
++            animator = ObjectAnimator.ofFloat(mVerticalTabsButton, TRANSLATION_X, 0);
++            animator.setDuration(URL_FOCUS_TOOLBAR_BUTTONS_DURATION_MS);
++            animator.setInterpolator(Interpolators.FAST_OUT_LINEAR_IN_INTERPOLATOR);
++            animators.add(animator);
++        }
++
+         if (getTabSwitcherButtonCoordinator() != null) {
+             animator =
+                     ObjectAnimator.ofFloat(
+--- a/chrome/browser/ui/side_ui/internal/android/java/src/org/chromium/chrome/browser/ui/side_ui/SideUiCoordinatorImpl.java
++++ b/chrome/browser/ui/side_ui/internal/android/java/src/org/chromium/chrome/browser/ui/side_ui/SideUiCoordinatorImpl.java
+@@ -44,6 +44,7 @@ import org.chromium.chrome.browser.lifec
+ import org.chromium.chrome.browser.tab.Tab;
+ import org.chromium.chrome.browser.ui.side_ui.SideUiCoordinator.HeightType;
+ import org.chromium.chrome.browser.ui.side_ui.SideUiCoordinator.SideUiSpecs.SideUiSize;
++import org.chromium.ui.base.DeviceFormFactor;
+ import org.chromium.ui.base.ViewUtils;
+ 
+ import java.util.ArrayList;
+@@ -267,7 +268,7 @@ final class SideUiCoordinatorImpl
+     public boolean canShowSideUi(@SideUiId int sideUiId) {
+         ThreadUtils.assertOnUiThread();
+         @Px int windowWidth = getWindowWidth();
+-        @Px int minWebContentsWidth = ViewUtils.dpToPx(mParentActivity, MIN_WEB_CONTENTS_WIDTH_DP);
++        @Px int minWebContentsWidth = ViewUtils.dpToPx(mParentActivity, minWebContentsWidthDp());
+         boolean isFullscreen = mFullscreenManager.getPersistentFullscreenMode();
+         var sideUiShowability =
+                 determineSideUiShowability(windowWidth, minWebContentsWidth, isFullscreen);
+@@ -407,7 +408,7 @@ final class SideUiCoordinatorImpl
+ 
+         // 3. Determine the new SideUiShowability, SideUiSpecs, and AnchorContainerTopMargins.
+         @Px int windowWidth = getWindowWidth();
+-        @Px int minWebContentsWidth = ViewUtils.dpToPx(mParentActivity, MIN_WEB_CONTENTS_WIDTH_DP);
++        @Px int minWebContentsWidth = ViewUtils.dpToPx(mParentActivity, minWebContentsWidthDp());
+         boolean isFullscreen = mFullscreenManager.getPersistentFullscreenMode();
+         SideUiShowability newSideUiShowability =
+                 determineSideUiShowability(windowWidth, minWebContentsWidth, isFullscreen);
+@@ -509,6 +510,15 @@ final class SideUiCoordinatorImpl
+      * @param isFullscreen Whether the app is in persistent fullscreen mode.
+      * @return The new {@link SideUiShowability}.
+      */
++    /**
++     * The width reserved for the page beside a side UI. The stock 412dp is wider than a phone
++     * window, so with the tab strip forced on -- where the vertical tab rail is the side UI in
++     * question -- reserve less and let the collapsed rail fit.
++     */
++    private int minWebContentsWidthDp() {
++        return DeviceFormFactor.isForceTabletUI() ? 160 : MIN_WEB_CONTENTS_WIDTH_DP;
++    }
++
+     private SideUiShowability determineSideUiShowability(
+             @Px int windowWidth, @Px int minWebContentsWidth, boolean isFullscreen) {
+         int availableWidth = windowWidth - minWebContentsWidth;
+--- a/chrome/browser/ui/vertical_tabs/android/java/src/org/chromium/chrome/browser/ui/vertical_tabs/VerticalTabUtils.java
++++ b/chrome/browser/ui/vertical_tabs/android/java/src/org/chromium/chrome/browser/ui/vertical_tabs/VerticalTabUtils.java
+@@ -25,8 +25,29 @@ public class VerticalTabUtils {
+     /** The width of the vertical tabs SideUiContainer in dp. */
+     public static final int SIDE_UI_CONTAINER_WIDTH_DP = 240;
+ 
++    /** Narrowest and widest the rail may be set to from settings. */
++    public static final int RAIL_WIDTH_MIN_DP = 100;
++
++    /**
++     * How wide the rail starts out. Upstream's 240dp eats most of a phone window, so default to
++     * something that still leaves the toolbar and the page usable.
++     */
++    public static final int RAIL_WIDTH_DEFAULT_DP = 160;
++
++    public static final int RAIL_WIDTH_MAX_DP = 320;
++
++    /** How wide the rail shows its tabs, in dp; chosen in Settings > Experimental > Tabs. */
++    public static int railWidthDp() {
++        int stored =
++                ChromeSharedPreferences.getInstance()
++                        .readInt(ChromePreferenceKeys.VERTICAL_TABS_WIDTH, 0);
++        if (stored <= 0) return RAIL_WIDTH_DEFAULT_DP;
++        return Math.max(RAIL_WIDTH_MIN_DP, Math.min(RAIL_WIDTH_MAX_DP, stored));
++    }
++
+     /** The width of the collapsed vertical tabs SideUiContainer in dp. */
+-    public static final int SIDE_UI_CONTAINER_COLLAPSED_WIDTH_DP = 76;
++    // Collapsed hides the rail outright; the toolbar button brings it back.
++    public static final int SIDE_UI_CONTAINER_COLLAPSED_WIDTH_DP = 0;
+ 
+     /**
+      * Minimum window width threshold in dp required to allow expanding vertical tabs rail and
+@@ -34,6 +55,15 @@ public class VerticalTabUtils {
+      */
+     public static final int MIN_EXPAND_WINDOW_WIDTH_DP = 652;
+ 
++    /**
++     * The narrowest window in which the rail may be expanded. Upstream asks for a tablet-sized
++     * window; with the tab strip forced on the phone is the target, so allow it there and let the
++     * collapse button work instead of sitting permanently disabled.
++     */
++    public static int minExpandWindowWidthDp() {
++        return DeviceFormFactor.isForceTabletUI() ? 320 : MIN_EXPAND_WINDOW_WIDTH_DP;
++    }
++
+     @IntDef({
+         LayoutSwitchEntryPoint.APP_MENU,
+         LayoutSwitchEntryPoint.TAB_CONTEXT_MENU,
+@@ -85,6 +115,11 @@ public class VerticalTabUtils {
+      * AndroidVerticalTabs feature flag to be enabled and the device to be a tablet form factor.
+      */
+     public static boolean isVerticalTabsEligible(Context context) {
++        // The activity picks its layout from this answer at creation (see MainLayoutSwitcher): the
++        // rail's view stubs only exist in the forked layout. The feature flag is a cached flag, so
++        // it lags a launch behind the feature state and would leave the layout without those stubs.
++        // Turning the tab strip on is an explicit opt-in, so let it stand on its own here.
++        if (DeviceFormFactor.isForceTabletUI()) return true;
+         return ChromeFeatureList.sAndroidVerticalTabs.isEnabled()
+                 && DeviceFormFactor.isNonMultiDisplayContextOnTablet(context);
+     }
