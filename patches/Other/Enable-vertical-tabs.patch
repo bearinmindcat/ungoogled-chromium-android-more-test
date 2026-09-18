@@ -1,3 +1,37 @@
+--- a/chrome/android/features/tab_ui/BUILD.gn
++++ b/chrome/android/features/tab_ui/BUILD.gn
+@@ -84,11 +84,14 @@ android_resources("java_resources") {
+     "java/res/drawable/vertical_tab_ai_indicator_background.xml",
+     "java/res/drawable/vertical_tab_item_background.xml",
+     "java/res/drawable/vertical_tab_pinned_item_background.xml",
++    "java/res/drawable/vertical_tab_rail_hairline.xml",
+     "java/res/drawable/vertical_tabs_bottom_rounded_button_background.xml",
+     "java/res/drawable/vertical_tabs_left_rounded_button_background.xml",
+     "java/res/drawable/vertical_tabs_menu_collapse.xml",
+     "java/res/drawable/vertical_tabs_menu_expand.xml",
+     "java/res/drawable/vertical_tabs_new_tab_button_background.xml",
++    "java/res/drawable/vertical_tabs_new_tab_icon.xml",
++    "java/res/drawable/vertical_tabs_new_tab_plus.xml",
+     "java/res/drawable/vertical_tabs_right_rounded_button_background.xml",
+     "java/res/drawable/vertical_tabs_scrollbar_thumb.xml",
+     "java/res/drawable/vertical_tabs_top_rounded_button_background.xml",
+--- /dev/null
++++ b/chrome/android/features/tab_ui/java/res/drawable/vertical_tab_rail_hairline.xml
+@@ -0,0 +1,14 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++Copyright 2026 The Chromium Authors
++Use of this source code is governed by a BSD-style license that can be
++found in the LICENSE file.
++-->
++
++<!-- The rail's border rule. Same colour and thickness as the hairline under the address bar and
++     as the side UI's own vertical_hairline, which cannot be reused from here. -->
++<shape xmlns:android="http://schemas.android.com/apk/res/android"
++    android:shape="rectangle">
++    <solid android:color="@color/divider_color" />
++    <size android:width="@dimen/toolbar_hairline_height" />
++</shape>
 --- a/chrome/android/features/tab_ui/java/res/drawable/vertical_tabs_menu_collapse.xml
 +++ b/chrome/android/features/tab_ui/java/res/drawable/vertical_tabs_menu_collapse.xml
 @@ -3,15 +3,19 @@
@@ -52,9 +86,74 @@
 +      android:fillType="nonZero"
 +      android:pathData="M3.57,13.73 a1.25,1.25 0 0 1 -0.92,-0.38 a1.25,1.25 0 0 1 -0.38,-0.92 V3.57 c0,-0.36 0.13,-0.67 0.38,-0.92 a1.25,1.25 0 0 1 0.92,-0.38 h8.87 c0.36,0 0.67,0.13 0.92,0.38 c0.25,0.25 0.38,0.56 0.38,0.92 v8.87 c0,0.36 -0.13,0.67 -0.38,0.92 a1.25,1.25 0 0 1 -0.92,0.38 Z m6.87,-1.38 h1.92 V3.65 h-1.92 Z m-1.39,0 V3.65 H3.65 v8.7 Z m1.39,0 h1.92 Z" />
  </vector>
+--- /dev/null
++++ b/chrome/android/features/tab_ui/java/res/drawable/vertical_tabs_new_tab_icon.xml
+@@ -0,0 +1,17 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++Copyright 2026 The Chromium Authors
++Use of this source code is governed by a BSD-style license that can be
++found in the LICENSE file.
++-->
++
++<!-- Places the add-tab glyph exactly where a tab row places its favicon: the same 24dp slot,
++     the same inset from the row's start, centred vertically. -->
++<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
++    <item
++        android:drawable="@drawable/vertical_tabs_new_tab_plus"
++        android:gravity="start|center_vertical"
++        android:height="@dimen/vertical_tab_item_icon_size"
++        android:start="@dimen/vertical_tab_item_padding_horizontal"
++        android:width="@dimen/vertical_tab_item_icon_size" />
++</layer-list>
+--- /dev/null
++++ b/chrome/android/features/tab_ui/java/res/drawable/vertical_tabs_new_tab_plus.xml
+@@ -0,0 +1,20 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++Copyright 2026 The Chromium Authors
++Use of this source code is governed by a BSD-style license that can be
++found in the LICENSE file.
++-->
++
++<!-- The rail's add-tab glyph. ic_add_24dp only reaches 14dp across its 24dp box, which reads
++     smaller than the favicons beside it (about 20dp), so this spans 20dp at the same 2dp arm
++     width. -->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24"
++    android:tint="@macro/default_icon_color">
++    <path
++        android:fillColor="@android:color/white"
++        android:pathData="M11,2h2v9h9v2h-9v9h-2v-9h-9v-2h9z" />
++</vector>
+--- a/chrome/android/features/tab_ui/java/res/layout/vertical_tab_item.xml
++++ b/chrome/android/features/tab_ui/java/res/layout/vertical_tab_item.xml
+@@ -13,6 +13,7 @@ found in the LICENSE file.
+     android:paddingBottom="@dimen/vertical_tab_item_padding_vertical"
+     android:paddingStart="0dp"
+     android:paddingEnd="@dimen/vertical_tab_item_padding_horizontal"
++    android:clipToPadding="false"
+     android:layout_marginBottom="@dimen/vertical_tab_item_margin_bottom"
+     android:background="@drawable/vertical_tab_item_background">
+ 
 --- a/chrome/android/features/tab_ui/java/res/layout/vertical_tab_layout.xml
 +++ b/chrome/android/features/tab_ui/java/res/layout/vertical_tab_layout.xml
-@@ -32,7 +32,8 @@ found in the LICENSE file.
+@@ -13,8 +13,9 @@ found in the LICENSE file.
+     android:layout_height="match_parent"
+     android:background="@macro/vertical_tabs_rail_bg_color"
+     android:clipToPadding="false"
+-    android:paddingStart="@dimen/vertical_tabs_rail_horizontal_margin"
+-    android:paddingEnd="@dimen/vertical_tabs_rail_horizontal_margin">
++    android:paddingTop="@dimen/vertical_tabs_rail_padding_top"
++    android:paddingStart="@dimen/vertical_tabs_rail_padding_start"
++    android:paddingEnd="@dimen/vertical_tabs_rail_padding_end">
+ 
+     <View
+         android:id="@+id/desktop_window_spacer"
+@@ -32,7 +33,8 @@ found in the LICENSE file.
          android:layout_gravity="start"
          android:layout_marginVertical="@dimen/vertical_tabs_header_margin_vertical"
          app:layout_constraintTop_toBottomOf="@id/desktop_window_spacer"
@@ -64,7 +163,7 @@
          <ImageButton
              android:id="@+id/collapse_button"
              android:layout_width="@dimen/vertical_tabs_header_button_size"
-@@ -40,7 +41,7 @@ found in the LICENSE file.
+@@ -40,7 +42,7 @@ found in the LICENSE file.
              android:src="@drawable/vertical_tabs_menu_collapse"
              android:background="?attr/selectableItemBackgroundBorderless"
              android:contentDescription="@string/accessibility_collapse_vertical_tabs"
@@ -73,7 +172,7 @@
              android:padding="@dimen/vertical_tabs_header_button_padding"
              android:layout_marginEnd="@dimen/vertical_tabs_header_button_collapsed_margin_end"
              android:visibility="visible" />
-@@ -57,9 +58,10 @@ found in the LICENSE file.
+@@ -57,9 +59,10 @@ found in the LICENSE file.
              android:src="@drawable/ic_grid_view_16dp"
              android:background="@drawable/vertical_tabs_left_rounded_button_background"
              android:contentDescription="@string/accessibility_tab_groups"
@@ -86,7 +185,7 @@
          <ImageButton
              android:id="@+id/tab_search_button"
              android:layout_width="@dimen/vertical_tabs_header_button_size"
-@@ -67,8 +69,9 @@ found in the LICENSE file.
+@@ -67,8 +70,9 @@ found in the LICENSE file.
              android:src="@drawable/ic_manage_search_16dp"
              android:background="@drawable/vertical_tabs_right_rounded_button_background"
              android:contentDescription="@string/accessibility_search_loupe_tooltip_text"
@@ -98,9 +197,33 @@
      </LinearLayout>
  
      <!-- Pinned Tabs Recycler View -->
+@@ -109,7 +113,8 @@ found in the LICENSE file.
+         app:layout_constraintTop_toBottomOf="@id/tab_list_recycler_view"
+         app:layout_constraintBottom_toBottomOf="parent"
+         app:layout_constraintVertical_bias="0.0"
+-        android:src="@drawable/ic_add_24dp"
++        android:src="@drawable/vertical_tabs_new_tab_icon"
++        android:scaleType="fitXY"
+         android:background="@drawable/vertical_tabs_new_tab_button_background"
+         android:contentDescription="@string/accessibility_toolbar_btn_new_tab"
+         android:layout_marginTop="@dimen/vertical_tabs_new_tab_button_margin_top"
 --- a/chrome/android/features/tab_ui/java/res/values/dimens.xml
 +++ b/chrome/android/features/tab_ui/java/res/values/dimens.xml
-@@ -203,7 +203,7 @@ found in the LICENSE file.
+@@ -199,11 +199,21 @@ found in the LICENSE file.
+ 
+     <!-- Dimens for vertical tabs -->
+     <dimen name="vertical_tabs_rail_horizontal_margin">12dp</dimen>
++    <!-- Puts the rail's favicon column on the same centre as the toolbar's vertical tabs
++         button: this padding + the item's 8dp inset + half of the 24dp icon = 24dp. -->
++    <dimen name="vertical_tabs_rail_padding_start">4dp</dimen>
++    <!-- Matches the start padding, so the rail leaves the same dark margin either side of a row.
++         A row's close button still ends exactly where the resize strip begins. -->
++    <dimen name="vertical_tabs_rail_padding_end">4dp</dimen>
++    <!-- Rows sit 16dp apart (6dp item padding + 4dp margin + 6dp item padding). Leaving the
++         first row only its own 6dp put it closer to the toolbar than to its neighbour, so make
++         up the missing 10dp here. -->
++    <dimen name="vertical_tabs_rail_padding_top">10dp</dimen>
+     <dimen name="vertical_tabs_scrollbar_margin_end">-9dp</dimen>
      <dimen name="vertical_tabs_scrollbar_padding_end">9dp</dimen>
      <dimen name="vertical_tabs_scrollbar_width">3dp</dimen>
      <dimen name="vertical_tabs_scrollbar_radius">100dp</dimen>
@@ -109,6 +232,89 @@
      <dimen name="vertical_tab_item_loading_spinner_thickness">2dp</dimen>
      <dimen name="vertical_tab_item_padding_horizontal">8dp</dimen>
      <dimen name="vertical_tab_item_padding_vertical">6dp</dimen>
+@@ -228,8 +238,12 @@ found in the LICENSE file.
+     <dimen name="vertical_tab_pinned_item_ai_indicator_margin_start">2dp</dimen>
+ 
+     <!-- New Tab button dimens.-->
+-    <dimen name="vertical_tabs_new_tab_button_height">40dp</dimen>
+-    <dimen name="vertical_tabs_new_tab_button_margin_top">8dp</dimen>
++    <!-- The same height as a tab row (6dp padding, 24dp icon, 6dp padding), so the add-tab
++         button reads as one more row rather than a larger block beneath them. -->
++    <dimen name="vertical_tabs_new_tab_button_height">36dp</dimen>
++    <!-- None of its own: the last row's 4dp bottom margin already spaces it exactly as rows are
++         spaced from each other. -->
++    <dimen name="vertical_tabs_new_tab_button_margin_top">0dp</dimen>
+     <dimen name="vertical_tabs_new_tab_button_margin_bottom">12dp</dimen>
+     <dimen name="vertical_tabs_new_tab_button_corner_radius">8dp</dimen>
+ 
+--- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/TabVerticalViewBinder.java
++++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/TabVerticalViewBinder.java
+@@ -256,9 +256,12 @@ class TabVerticalViewBinder {
+         TabActionButtonData actionData = model.get(TabProperties.TAB_ACTION_BUTTON_DATA);
+         // Close button is always visible on touch devices, but only visible on select/hover on
+         // desktop.
++        boolean iconOnlyRail = VerticalTabUtils.isIconOnlyRail();
+         boolean actionWanted =
+                 actionButton != null
+                         && actionData != null
++                        && VerticalTabUtils.isCloseButtonShown()
++                        && !iconOnlyRail
+                         && (isRailCollapsed
+                                 ? (isSelected && (!DeviceInfo.isDesktop() || isHovered))
+                                 : (!DeviceInfo.isDesktop() || isSelected || isHovered));
+@@ -269,7 +272,9 @@ class TabVerticalViewBinder {
+                         && actorState != null
+                         && actorState.tabIndicator != TabIndicatorStatus.NONE;
+         @MediaState int mediaState = model.get(TabProperties.MEDIA_INDICATOR);
+-        boolean mediaWanted = mediaIndicator != null && mediaState != MediaState.NONE;
++        // The badge is anchored to the row's end, which at icon-only widths lands on the favicon.
++        boolean mediaWanted =
++                mediaIndicator != null && mediaState != MediaState.NONE && !iconOnlyRail;
+         boolean loadingWanted = spinner != null && model.get(TabProperties.IS_LOADING);
+         boolean faviconWanted =
+                 faviconView != null
+@@ -675,7 +680,7 @@ class TabVerticalViewBinder {
+ 
+         boolean isRailCollapsed =
+                 model.get(TabProperties.RAIL_COLLAPSE_STATE) == RailCollapseState.COLLAPSED;
+-        if (isRailCollapsed) {
++        if (isRailCollapsed || VerticalTabUtils.isIconOnlyRail()) {
+             titleView.setVisibility(View.GONE);
+         } else {
+             titleView.setVisibility(View.VISIBLE);
+@@ -815,10 +820,13 @@ class TabVerticalViewBinder {
+         if (!isSelected) {
+             return ColorStateList.valueOf(Color.TRANSPARENT);
+         }
++        // colorSurface sits almost on top of the rail's own background, which left the current
++        // tab unmarked. Use Material's active-indicator colour, the same role a navigation rail
++        // uses for the destination you are on.
+         int color =
+                 isIncognito
+                         ? context.getColor(R.color.default_bg_color_dark)
+-                        : SemanticColorUtils.getColorSurface(context);
++                        : SemanticColorUtils.getColorSecondaryContainer(context);
+         return ColorStateList.valueOf(color);
+     }
+ 
+@@ -836,7 +844,7 @@ class TabVerticalViewBinder {
+         if (isSelected) {
+             return isIncognito
+                     ? context.getColor(R.color.default_text_color_light)
+-                    : SemanticColorUtils.getColorOnSurface(context);
++                    : SemanticColorUtils.getColorOnSecondaryContainer(context);
+         } else {
+             return isIncognito
+                     ? context.getColor(R.color.incognito_tab_title_color)
+@@ -861,7 +869,7 @@ class TabVerticalViewBinder {
+         }
+         return ColorStateList.valueOf(
+                 isSelected
+-                        ? SemanticColorUtils.getDefaultIconColor(context)
++                        ? SemanticColorUtils.getColorOnSecondaryContainer(context)
+                         : SemanticColorUtils.getDefaultIconColorSecondary(context));
+     }
+ 
 --- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabListViewBinder.java
 +++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabListViewBinder.java
 @@ -15,6 +15,7 @@ import androidx.core.widget.ImageViewCom
@@ -161,7 +367,47 @@
                          ? R.string.accessibility_collapse_vertical_tabs
 --- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabsSideUiCoordinator.java
 +++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabsSideUiCoordinator.java
-@@ -46,7 +46,7 @@ import java.util.List;
+@@ -5,8 +5,10 @@
+ package org.chromium.chrome.browser.tasks.tab_management.vertical_tabs;
+ 
+ import static java.util.Collections.emptySet;
++import static org.chromium.build.NullUtil.assumeNonNull;
+ 
+ import android.app.Activity;
++import android.content.SharedPreferences;
+ import android.content.res.Configuration;
+ import android.transition.ChangeBounds;
+ import android.transition.Fade;
+@@ -18,6 +20,16 @@ import android.widget.FrameLayout;
+ 
+ import androidx.annotation.Px;
+ 
++import android.graphics.Canvas;
++import android.graphics.DashPathEffect;
++import android.graphics.Paint;
++import android.graphics.drawable.Drawable;
++import android.view.Gravity;
++import android.view.MotionEvent;
++import android.view.View;
++
++import androidx.recyclerview.widget.RecyclerView;
++
+ import org.chromium.base.supplier.NonNullObservableSupplier;
+ import org.chromium.base.supplier.ObservableSuppliers;
+ import org.chromium.base.supplier.SettableNonNullObservableSupplier;
+@@ -34,6 +46,11 @@ import org.chromium.chrome.browser.ui.si
+ import org.chromium.chrome.browser.ui.side_ui.SideUiCoordinator.UiUpdateRequest;
+ import org.chromium.chrome.browser.ui.side_ui.SideUiObserver;
+ import org.chromium.chrome.browser.ui.vertical_tabs.VerticalTabUtils;
++import org.chromium.components.browser_ui.styles.SemanticColorUtils;
++import org.chromium.chrome.tab_ui.R;
++import org.chromium.base.Callback;
++import org.chromium.base.ContextUtils;
++import org.chromium.base.MathUtils;
+ import org.chromium.ui.base.ViewUtils;
+ 
+ import java.util.ArrayList;
+@@ -46,7 +63,7 @@ import java.util.List;
   */
  @NullMarked
  public class VerticalTabsSideUiCoordinator implements SideUiContainer, SideUiObserver {
@@ -170,7 +416,309 @@
      static final int COLLAPSED_WIDTH_DP = VerticalTabUtils.SIDE_UI_CONTAINER_COLLAPSED_WIDTH_DP;
  
      private final SideUiCoordinator mSideUiCoordinator;
-@@ -139,6 +139,11 @@ public class VerticalTabsSideUiCoordinat
+@@ -54,8 +71,16 @@ public class VerticalTabsSideUiCoordinat
+     private final @AnchorSide int mAnchorSide;
+     private final VerticalTabListCoordinator mTabListCoordinator;
+     private final VerticalTabRailCollapseController mCollapseController;
+-    private final @Px int mExpandedViewWidth;
++    private @Px int mExpandedViewWidth;
+     private final @Px int mCollapsedViewWidth;
++    private @Nullable ResizeHandleView mResizeHandle;
++    private @Nullable Callback<Boolean> mResizeGuideObserver;
++    private boolean mIsResizing;
++    private final @Px int mBorderGracePx;
++    private final @Px int mMinExpandedWidth;
++    private final @Px int mMaxExpandedWidth;
++    private @Px int mLastAvailableWidth = Integer.MAX_VALUE;
++    private final float mDensity;
+     private final SettableNonNullObservableSupplier<Boolean> mIsVerticalTabsActiveSupplier;
+     private final SettableNonNullObservableSupplier<Boolean> mIsAutoHiddenSupplier =
+             ObservableSuppliers.createNonNull(false);
+@@ -64,6 +89,14 @@ public class VerticalTabsSideUiCoordinat
+     // hidden by other conditions such as narrow window i.e. |mIsAutoHiddenSupplier.get()| is true.
+     private boolean mManualVisible;
+ 
++    // The rail's width and close buttons are changed from settings while the rail stays open.
++    private final SharedPreferences.OnSharedPreferenceChangeListener mRailSettingsListener =
++            (prefs, key) -> {
++                if (!VerticalTabUtils.isRailAppearanceKey(key)) return;
++                applyRailWidthFromSettings();
++                refreshRowsAfterResize();
++            };
++
+     public VerticalTabsSideUiCoordinator(
+             Activity activity,
+             SideUiCoordinator sideUiCoordinator,
+@@ -80,6 +113,19 @@ public class VerticalTabsSideUiCoordinat
+         mRootView =
+                 new FrameLayout(activity) {
+                     @Override
++                    public boolean dispatchTouchEvent(MotionEvent event) {
++                        // A press anywhere in the rail but its edge -- a tab, the new tab button
++                        // -- means the user has moved on from adjusting the width.
++                        if (event.getActionMasked() == MotionEvent.ACTION_DOWN
++                                && isResizeGuideVisible()
++                                && mResizeHandle != null
++                                && event.getX() < getWidth() - mResizeHandle.getWidth()) {
++                            hideResizeGuide();
++                        }
++                        return super.dispatchTouchEvent(event);
++                    }
++
++                    @Override
+                     protected void onConfigurationChanged(Configuration newConfig) {
+                         super.onConfigurationChanged(newConfig);
+                         // Observe configuration changes on mRootView because onSideUiSpecsChanged()
+@@ -89,7 +135,7 @@ public class VerticalTabsSideUiCoordinat
+                         // button state when crossing the narrow-window threshold.
+                         updateCollapseButtonAndRailState(
+                                 newConfig.screenWidthDp
+-                                        < VerticalTabUtils.MIN_EXPAND_WINDOW_WIDTH_DP);
++                                        < VerticalTabUtils.minExpandWindowWidthDp());
+                     }
+                 };
+         mRootView.setLayoutParams(
+@@ -97,9 +143,229 @@ public class VerticalTabsSideUiCoordinat
+                         FrameLayout.LayoutParams.MATCH_PARENT,
+                         FrameLayout.LayoutParams.MATCH_PARENT));
+         mRootView.addView(mTabListCoordinator.getView());
+-        mExpandedViewWidth = ViewUtils.dpToPx(activity, VIEW_WIDTH_DP);
++        mExpandedViewWidth = ViewUtils.dpToPx(activity, VerticalTabUtils.railWidthDp());
+         mCollapsedViewWidth = ViewUtils.dpToPx(activity, COLLAPSED_WIDTH_DP);
++        mBorderGracePx = ViewUtils.dpToPx(activity, VerticalTabUtils.RAIL_RESIZE_GRACE_DP);
++        mMinExpandedWidth = ViewUtils.dpToPx(activity, VerticalTabUtils.RAIL_WIDTH_MIN_DP);
++        mMaxExpandedWidth = ViewUtils.dpToPx(activity, VerticalTabUtils.RAIL_WIDTH_MAX_DP);
++        mDensity = activity.getResources().getDisplayMetrics().density;
++        addResizeHandle(activity);
+         mCollapseController.setRailCollapseListener(this::onRailCollapseStateChangeRequestedByUser);
++        ContextUtils.getAppSharedPreferences()
++                .registerOnSharedPreferenceChangeListener(mRailSettingsListener);
++    }
++
++    /**
++     * Puts a grab strip along the rail's outer edge so the width can be dragged rather than only
++     * set from settings. It is as wide as the rail's own end padding, which is empty space, so it
++     * never sits on top of a row's close button.
++     */
++    private void addResizeHandle(Activity activity) {
++        ResizeHandleView handle = new ResizeHandleView(activity);
++        mResizeHandle = handle;
++        int handleWidth =
++                ViewUtils.dpToPx(activity, VerticalTabUtils.RAIL_RESIZE_HANDLE_WIDTH_DP);
++        FrameLayout.LayoutParams params =
++                new FrameLayout.LayoutParams(
++                        handleWidth, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.END);
++        mRootView.addView(handle, params);
++
++        handle.setOnTouchListener(
++                (view, event) -> {
++                    // With the guide down the strip is only decoration, so let presses fall
++                    // through to the row beneath it.
++                    if (!handle.isGuideVisible()) return false;
++                    switch (event.getActionMasked()) {
++                        case MotionEvent.ACTION_DOWN:
++                            view.getParent().requestDisallowInterceptTouchEvent(true);
++                            mIsResizing = true;
++                            return true;
++                        case MotionEvent.ACTION_MOVE:
++                            // Re-assert it: the rail relayouts on every move, and a layout pass
++                            // clears the flag, which let the page's gestures back in mid-drag.
++                            view.getParent().requestDisallowInterceptTouchEvent(true);
++                            int[] location = new int[2];
++                            mRootView.getLocationOnScreen(location);
++                            setExpandedWidthPx(Math.round(event.getRawX()) - location[0]);
++                            return true;
++                        case MotionEvent.ACTION_UP:
++                        case MotionEvent.ACTION_CANCEL:
++                            view.getParent().requestDisallowInterceptTouchEvent(false);
++                            commitResize();
++                            return true;
++                        default:
++                            return false;
++                    }
++                });
++    }
++
++    /**
++     * Rebinds every row once a drag settles. Rows decide whether they have room for a title and a
++     * close button when they bind, so without this a rail dragged past that threshold keeps the
++     * look it had when the drag started.
++     */
++    private void refreshRowsAfterResize() {
++        View list = mRootView.findViewById(R.id.tab_list_recycler_view);
++        if (!(list instanceof RecyclerView recyclerView)) return;
++        RecyclerView.Adapter<?> adapter = recyclerView.getAdapter();
++        if (adapter != null) adapter.notifyDataSetChanged();
++    }
++
++    /**
++     * Shows or hides the dotted guide on the rail's edge. The edge is only draggable while the
++     * guide is out, so this is what arms and disarms resizing. Raised from the toolbar button's
++     * "Edit tabs" item.
++     */
++    public void toggleResizeGuide() {
++        setResizeGuideVisible(!isResizeGuideVisible());
++    }
++
++    /** Leaves width-editing, for a tap that landed anywhere but the rail's edge. */
++    public void hideResizeGuide() {
++        setResizeGuideVisible(false);
++    }
++
++    /** Told whenever width-editing is entered or left, so other gestures can stand down. */
++    public void setResizeGuideObserver(Callback<Boolean> observer) {
++        mResizeGuideObserver = observer;
++    }
++
++    private void setResizeGuideVisible(boolean visible) {
++        if (mResizeHandle == null || mResizeHandle.isGuideVisible() == visible) return;
++        mResizeHandle.setGuideVisible(visible);
++        if (mResizeGuideObserver != null) mResizeGuideObserver.onResult(visible);
++    }
++
++    /** Whether the rail's edge is currently armed for dragging. */
++    public boolean isResizeGuideVisible() {
++        return mResizeHandle != null && mResizeHandle.isGuideVisible();
++    }
++
++    /** Whether the rail's edge is being dragged right now. */
++    public boolean isResizingWidth() {
++        return mIsResizing;
++    }
++
++    private void commitResize() {
++        if (!mIsResizing) return;
++        mIsResizing = false;
++        VerticalTabUtils.setRailWidthDp(Math.round(mExpandedViewWidth / mDensity));
++        refreshRowsAfterResize();
++    }
++
++    /**
++     * Lets a press that landed just past the rail's border drag it anyway. The grab strip stops
++     * at the rail's edge, but a fingertip aimed at that edge lands half on the page, where the
++     * strip cannot reach it.
++     *
++     * @return whether this touch was taken as part of a resize.
++     */
++    public boolean handleBorderTouch(MotionEvent event) {
++        if (mResizeHandle == null || !mResizeHandle.isGuideVisible()) return false;
++        int[] location = new int[2];
++        mRootView.getLocationOnScreen(location);
++        switch (event.getActionMasked()) {
++            case MotionEvent.ACTION_DOWN:
++                int border = location[0] + mRootView.getWidth();
++                if (Math.abs(Math.round(event.getRawX()) - border) > mBorderGracePx) return false;
++                mIsResizing = true;
++                return true;
++            case MotionEvent.ACTION_MOVE:
++                if (!mIsResizing) return false;
++                setExpandedWidthPx(Math.round(event.getRawX()) - location[0]);
++                return true;
++            case MotionEvent.ACTION_UP:
++            case MotionEvent.ACTION_CANCEL:
++                if (!mIsResizing) return false;
++                commitResize();
++                return true;
++            default:
++                return false;
++        }
++    }
++
++    /** The grab strip on the rail's edge, which can draw a dotted guide down its centre. */
++    private static class ResizeHandleView extends View {
++        private static final float GUIDE_STROKE_DP = 2f;
++
++        private final Paint mGuidePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
++        private final Drawable mRule;
++        private final float mGuideStrokePx;
++        private final int mRuleWidthPx;
++        private boolean mGuideVisible;
++
++        ResizeHandleView(Activity activity) {
++            super(activity);
++            float density = activity.getResources().getDisplayMetrics().density;
++
++            mGuideStrokePx = GUIDE_STROKE_DP * density;
++            mGuidePaint.setStyle(Paint.Style.STROKE);
++            // The same colour the current tab's highlight uses, so the guide reads as part of the
++            // rail rather than a bright rule laid over it.
++            mGuidePaint.setColor(SemanticColorUtils.getColorSecondaryContainer(activity));
++            mGuidePaint.setStrokeWidth(mGuideStrokePx);
++            mGuidePaint.setPathEffect(
++                    new DashPathEffect(new float[] {6 * density, 5 * density}, 0));
++
++            // The ambient rule along the rail's border: the same shape drawable the address
++            // bar's hairline is built from, down to the colour resource and the dimension, so it
++            // fills whole pixels the way that one does rather than fading across a fractional
++            // one.
++            mRule = assumeNonNull(activity.getDrawable(R.drawable.vertical_tab_rail_hairline));
++            mRuleWidthPx = Math.max(1, mRule.getIntrinsicWidth());
++        }
++
++        boolean isGuideVisible() {
++            return mGuideVisible;
++        }
++
++        void setGuideVisible(boolean visible) {
++            if (mGuideVisible == visible) return;
++            mGuideVisible = visible;
++            invalidate();
++        }
++
++        @Override
++        protected void onDraw(Canvas canvas) {
++            super.onDraw(canvas);
++            // The rail begins at the top of the address bar's hairline, so start below it:
++            // running to the very top drew the vertical line straight through the horizontal
++            // one instead of meeting it.
++            int top = mRuleWidthPx;
++            // One or the other: the guide replaces the rule while the width is adjustable, so the
++            // border never carries two lines at once.
++            if (mGuideVisible) {
++                // Inset by half the stroke so none of the dashed line is clipped away.
++                float x = getWidth() - mGuideStrokePx / 2f;
++                canvas.drawLine(x, top, x, getHeight(), mGuidePaint);
++            } else {
++                mRule.setBounds(getWidth() - mRuleWidthPx, top, getWidth(), getHeight());
++                mRule.draw(canvas);
++            }
++        }
++    }
++
++    /** Takes up a width chosen in settings. A drag records its own width once it ends. */
++    private void applyRailWidthFromSettings() {
++        if (mIsResizing) return;
++        int widthPx = Math.round(VerticalTabUtils.railWidthDp() * mDensity);
++        if (Math.abs(widthPx - mExpandedViewWidth) <= Math.ceil(mDensity)) return;
++        setExpandedWidthPx(widthPx);
++    }
++
++    /** Resizes the rail live while its edge is being dragged. */
++    private void setExpandedWidthPx(@Px int widthPx) {
++        // Stop the drag where the rail stops fitting, rather than letting it run past the point
++        // the window can accommodate.
++        int max =
++                Math.max(
++                        mMinExpandedWidth, Math.min(mMaxExpandedWidth, mLastAvailableWidth));
++        int clamped = MathUtils.clamp(widthPx, mMinExpandedWidth, max);
++        if (clamped == mExpandedViewWidth) return;
++        mExpandedViewWidth = clamped;
++        // Suppress animations: the width should track the finger, not ease towards it.
++        mSideUiCoordinator.updateUi(
++                new UiUpdateRequest(getSideUiId(), /* suppressAnimations= */ true));
+     }
+ 
+     public NonNullObservableSupplier<Boolean> getIsAutoHiddenSupplier() {
+@@ -121,6 +387,8 @@ public class VerticalTabsSideUiCoordinat
+     }
+ 
+     public void destroy() {
++        ContextUtils.getAppSharedPreferences()
++                .unregisterOnSharedPreferenceChangeListener(mRailSettingsListener);
+         updateAutoHiddenState(false);
+         mSideUiCoordinator.removeObserver(this);
+         mCollapseController.setRailCollapseListener(null);
+@@ -139,22 +407,35 @@ public class VerticalTabsSideUiCoordinat
          return SideUiId.VERTICAL_TABS;
      }
  
@@ -182,8 +730,23 @@
      @Override
      public SideUiSize determineShowableSize(
              @Px int availableWidth, @Px int windowWidth, boolean isFullscreen) {
-@@ -152,9 +157,11 @@ public class VerticalTabsSideUiCoordinat
-                         : mExpandedViewWidth;
+         if (isFullscreen) {
+             return new SideUiSize(0, HeightType.NOT_APPLICABLE);
+         }
+-        int targetWidth =
++        mLastAvailableWidth = availableWidth;
++        boolean isCollapsed =
+                 mCollapseController.getEffectiveRailCollapseState(isCurrentWindowNarrow())
+-                                == RailCollapseState.COLLAPSED
++                        == RailCollapseState.COLLAPSED;
++        // A rail asked to be wider than the window allows used to disappear outright, and the
++        // width that caused it stayed stored, so it never came back on its own. Trim the request
++        // to what fits and hide only when even the narrowest rail has no room.
++        int targetWidth =
++                isCollapsed
+                         ? mCollapsedViewWidth
+-                        : mExpandedViewWidth;
++                        : Math.min(mExpandedViewWidth, Math.max(availableWidth, mMinExpandedWidth));
          boolean shouldHide = availableWidth < targetWidth;
          updateAutoHiddenState(mManualVisible && shouldHide);
 +        // WEB_CONTENTS keeps the rail under the top controls, so collapsing and expanding it
@@ -195,15 +758,51 @@
      }
  
      private void updateAutoHiddenState(boolean isHiddenDueToNarrowWidth) {
+@@ -204,7 +485,9 @@ public class VerticalTabsSideUiCoordinat
+         int newWidth = sideUiSpecs.getWidth(side);
+         int oldWidth = mSideUiCoordinator.getCurrentSideUiSpecs().getWidth(side);
+ 
+-        if (oldWidth > 0 && newWidth > 0 && oldWidth != newWidth) {
++        // Upstream animates only a resize between two visible widths. The rail collapses to
++        // nothing here, so open and close need the same treatment or they snap.
++        if (oldWidth != newWidth) {
+             TransitionSet transitionSet =
+                     new TransitionSet()
+                             .setOrdering(TransitionSet.ORDERING_TOGETHER)
+@@ -260,7 +543,7 @@ public class VerticalTabsSideUiCoordinat
+ 
+     private boolean isCurrentWindowNarrow() {
+         return mRootView.getContext().getResources().getConfiguration().screenWidthDp
+-                < VerticalTabUtils.MIN_EXPAND_WINDOW_WIDTH_DP;
++                < VerticalTabUtils.minExpandWindowWidthDp();
+     }
+ 
+     @RailCollapseState
 --- a/chrome/android/java/res/xml/experimental_tabs_preferences.xml
 +++ b/chrome/android/java/res/xml/experimental_tabs_preferences.xml
-@@ -22,6 +22,20 @@ found in the LICENSE file.
+@@ -13,16 +13,38 @@ found in the LICENSE file.
+         android:key="enable_tabs_switch"
+         android:title="@string/enable_tabs_title"/>
+     <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:dependency="enable_tabs_switch"
+         android:key="floating_tabs_switch"
+         android:title="@string/floating_tabs_title"/>
+     <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:dependency="enable_tabs_switch"
+         android:key="background_tab_close_switch"
+         android:title="@string/background_tab_close_title"/>
+     <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
          android:dependency="floating_tabs_switch"
          android:key="dark_tab_strip_switch"
          android:title="@string/dark_tab_strip_title"/>
 +    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:dependency="enable_tabs_switch"
 +        android:key="vertical_tabs_switch"
 +        android:title="@string/vertical_tabs_title"/>
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:dependency="vertical_tabs_switch"
++        android:key="vertical_tabs_show_close_switch"
++        android:title="@string/vertical_tabs_show_close_title"/>
 +    <SeekBarPreference
 +        android:key="vertical_tabs_width_pref"
 +        android:dependency="vertical_tabs_switch"
@@ -211,13 +810,238 @@
 +        android:max="320"
 +        android:persistent="false"
 +        android:title="@string/vertical_tabs_width_title"
-+        app:min="100"
-+        app:seekBarIncrement="10"
++        app:min="48"
++        app:seekBarIncrement="4"
 +        app:showSeekBarValue="true"
 +        app:updatesContinuously="true"/>
      <SeekBarPreference
++        android:dependency="enable_tabs_switch"
          android:key="min_tab_width_pref"
          android:layout="@layout/preference_widget_seekbar_material"
+         android:max="180"
+@@ -33,6 +55,7 @@ found in the LICENSE file.
+         app:showSeekBarValue="true"
+         app:updatesContinuously="true"/>
+     <ListPreference
++        android:dependency="enable_tabs_switch"
+         android:key="tab_stacking_pref"
+         android:persistent="false"
+         android:title="@string/tab_stacking_title"/>
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/CompositorViewHolder.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/CompositorViewHolder.java
+@@ -16,6 +16,7 @@ import static org.chromium.ui.base.KeyNa
+ 
+ import static java.util.Collections.emptySet;
+ 
++import android.animation.ValueAnimator;
+ import android.app.Activity;
+ import android.content.Context;
+ import android.graphics.Color;
+@@ -43,6 +44,7 @@ import android.widget.FrameLayout;
+ 
+ import androidx.annotation.VisibleForTesting;
+ import androidx.core.view.ViewCompat;
++import androidx.core.view.animation.PathInterpolatorCompat;
+ import androidx.core.view.WindowCompat;
+ import androidx.core.view.WindowInsetsCompat;
+ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
+@@ -91,6 +93,7 @@ import org.chromium.chrome.browser.tabmo
+ import org.chromium.chrome.browser.theme.ToolbarThemeColorProvider;
+ import org.chromium.chrome.browser.toolbar.ControlContainer;
+ import org.chromium.chrome.browser.ui.side_panel.AndroidSidePanelEnabledFn;
++import org.chromium.chrome.browser.ui.side_ui.SideUiCoordinator;
+ import org.chromium.chrome.browser.ui.side_ui.SideUiCoordinator.AnchorSide;
+ import org.chromium.chrome.browser.ui.side_ui.SideUiCoordinator.SideUiSpecs;
+ import org.chromium.chrome.browser.ui.side_ui.SideUiObserver;
+@@ -187,6 +190,7 @@ public class CompositorViewHolder extend
+     private boolean mIsKeyboardShowing;
+     private boolean mNativeInitialized;
+     private LayoutManagerImpl mLayoutManager;
++    private @Nullable ValueAnimator mSideUiContentOffsetAnimator;
+     private Activity mActivity;
+     private CompositorView mCompositorView;
+ 
+@@ -1504,6 +1508,7 @@ public class CompositorViewHolder extend
+         // Trigger changes to Java Views, but delay any direct changes to composited views until
+         // #onSideUiSpecsChanged().
+         repositionTabViewForSideUi(sideUiSpecs);
++        startSideUiContentOffsetAnimation(sideUiSpecs);
+         // Padding will not be animated by the Transition as doing so would request a layout on
+         // every frame. Instead, padding is allowed to remain at its final state during a
+         // Transition. Disable clipToPadding to prevent clipping during the Transition. This will
+@@ -1515,10 +1520,59 @@ public class CompositorViewHolder extend
+ 
+     @Override
+     public void onTransitionEnded(SideUiSpecs sideUiSpecs) {
++        cancelSideUiContentOffsetAnimation();
+         onSideUiSpecsChanged(sideUiSpecs);
+         resetClipToPadding();
+     }
+ 
++    /**
++     * Slides the composited page alongside a side UI container instead of leaving it in place and
++     * snapping it when the container has finished moving.
++     *
++     * <p>The page is sized up front for whichever of the two states is wider, so that while it
++     * travels it always covers the part of the window it is moving across. Only its offset is
++     * animated, which is a compositor property and costs no relayout; the real size is applied
++     * once at the end by {@link #onSideUiSpecsChanged}.
++     */
++    private void startSideUiContentOffsetAnimation(SideUiSpecs newSideUiSpecs) {
++        cancelSideUiContentOffsetAnimation();
++        if (mSideUiStateProvider == null || mLayoutManager == null) return;
++
++        SideUiSpecs currentSideUiSpecs = mSideUiStateProvider.getCurrentSideUiSpecs();
++        int fromLeft = currentSideUiSpecs.getWidth(AnchorSide.LEFT);
++        int toLeft = newSideUiSpecs.getWidth(AnchorSide.LEFT);
++        if (fromLeft == toLeft) return;
++
++        int widestLeft = Math.min(fromLeft, toLeft);
++        int widestRight =
++                Math.min(
++                        currentSideUiSpecs.getWidth(AnchorSide.RIGHT),
++                        newSideUiSpecs.getWidth(AnchorSide.RIGHT));
++        updateWebContentsSize(
++                getCurrentTab(), getViewportSize().x - widestLeft - widestRight);
++
++        mSideUiContentOffsetAnimator = ValueAnimator.ofInt(fromLeft, toLeft);
++        mSideUiContentOffsetAnimator.setDuration(SideUiCoordinator.TRANSITION_DURATION_MS);
++        mSideUiContentOffsetAnimator.setInterpolator(
++                PathInterpolatorCompat.create(
++                        SideUiCoordinator.TRANSITION_INTERPOLATOR_CONTROL_POINTS[0],
++                        SideUiCoordinator.TRANSITION_INTERPOLATOR_CONTROL_POINTS[1],
++                        SideUiCoordinator.TRANSITION_INTERPOLATOR_CONTROL_POINTS[2],
++                        SideUiCoordinator.TRANSITION_INTERPOLATOR_CONTROL_POINTS[3]));
++        mSideUiContentOffsetAnimator.addUpdateListener(
++                animation -> {
++                    if (mLayoutManager == null) return;
++                    mLayoutManager.setContentOffsetX((int) animation.getAnimatedValue());
++                });
++        mSideUiContentOffsetAnimator.start();
++    }
++
++    private void cancelSideUiContentOffsetAnimation() {
++        if (mSideUiContentOffsetAnimator == null) return;
++        mSideUiContentOffsetAnimator.cancel();
++        mSideUiContentOffsetAnimator = null;
++    }
++
+     @Override
+     public void onSideUiSpecsChanged(SideUiSpecs sideUiSpecs) {
+         // Delay #updateWebContentsSize to the end of the task queue. Some side panel instances
+@@ -1865,6 +1919,8 @@ public class CompositorViewHolder extend
+     public void onDetachedFromWindow() {
+         super.onDetachedFromWindow();
+ 
++        cancelSideUiContentOffsetAnimation();
++
+         // Removes the accessibility node provider from this view.
+         if (mNodeProvider != null) {
+             assumeNonNull(mAccessibilityView);
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelper.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelper.java
+@@ -4881,6 +4881,12 @@ public class StripLayoutHelper
+      * @param deferAnimations Whether to defer animations.
+      * @return A list of animators for the tab width update.
+      */
++    /** Resizes the tabs already on the strip for a new "Minimum tab width" setting. */
++    void onMinTabWidthChanged() {
++        finishAnimationsAndCloseDyingTabs();
++        computeAndUpdateTabWidth(/* animate= */ false, /* deferAnimations= */ false);
++    }
++
+     private @Nullable List<Animator> computeAndUpdateTabWidth(
+             boolean animate, boolean deferAnimations) {
+         // Skip updating the tab width when the tab strip width is unavailable.
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelperManager.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelperManager.java
+@@ -13,6 +13,7 @@ import static org.chromium.chrome.browse
+ import android.animation.Animator;
+ import android.animation.AnimatorListenerAdapter;
+ import android.content.Context;
++import android.content.SharedPreferences;
+ import android.content.res.Resources;
+ import android.graphics.Bitmap;
+ import android.graphics.Color;
+@@ -32,6 +33,7 @@ import androidx.annotation.Px;
+ import androidx.annotation.VisibleForTesting;
+ 
+ import org.chromium.base.Callback;
++import org.chromium.base.ContextUtils;
+ import org.chromium.base.metrics.RecordUserAction;
+ import org.chromium.base.supplier.MonotonicObservableSupplier;
+ import org.chromium.base.supplier.NonNullObservableSupplier;
+@@ -79,6 +81,7 @@ import org.chromium.chrome.browser.lifec
+ import org.chromium.chrome.browser.multiwindow.MultiInstanceManager;
+ import org.chromium.chrome.browser.multiwindow.MultiWindowUtils;
+ import org.chromium.chrome.browser.omnibox.OmniboxStub;
++import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+ import org.chromium.chrome.browser.profiles.Profile;
+ import org.chromium.chrome.browser.share.ShareDelegate;
+ import org.chromium.chrome.browser.tab.MediaState;
+@@ -222,6 +225,7 @@ public class StripLayoutHelperManager
+     private float mHeight; // Height of the entire tab strip compositor layer in DP.
+     private @Nullable Callback<Integer> mExtraHeightRequestCallback;
+     private boolean mSubstripVisible;
++    private final SharedPreferences.OnSharedPreferenceChangeListener mMinTabWidthListener;
+     private final float mScrollableStripHeight; // Height of the scrollable tab strip layer in DP.
+ 
+     // Padding regions that tabs should remain untouchable.
+@@ -734,6 +738,16 @@ public class StripLayoutHelperManager
+                         snackbarManager,
+                         activityResultTracker,
+                         canActivateTabLayoutToggleMenuSupplier);
++        // Applies "Minimum tab width" as soon as it is changed. The strip otherwise took it up
++        // only on its next resize, which left it showing the previous value.
++        mMinTabWidthListener =
++                (prefs, key) -> {
++                    if (!ChromePreferenceKeys.FLAGS_MIN_TAB_WIDTH.equals(key)) return;
++                    mNormalHelper.onMinTabWidthChanged();
++                    mIncognitoHelper.onMinTabWidthChanged();
++                };
++        ContextUtils.getAppSharedPreferences()
++                .registerOnSharedPreferenceChangeListener(mMinTabWidthListener);
+ 
+         tabHoverCardViewStub.setOnInflateListener(
+                 (viewStub, view) -> {
+@@ -817,6 +831,8 @@ public class StripLayoutHelperManager
+             mOmniboxStub = null;
+         }
+         mTabObscuringHandler.removeObserver(this);
++        ContextUtils.getAppSharedPreferences()
++                .unregisterOnSharedPreferenceChangeListener(mMinTabWidthListener);
+         mTabStripTreeProvider.destroy();
+         mTabStripTreeProvider = null;
+         mTrailingButtonsCoordinator.destroy();
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabStripContextMenuCoordinator.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabStripContextMenuCoordinator.java
+@@ -25,7 +25,6 @@ import org.chromium.build.annotations.Nu
+ import org.chromium.chrome.browser.bookmarks.BookmarkAllTabsHandler;
+ import org.chromium.chrome.browser.compositor.overlays.strip.TabContextMenuCoordinator.TabStripLayoutType;
+ import org.chromium.chrome.browser.compositor.overlays.strip.TabStripMenuMetricsUtils.StripMenuAction;
+-import org.chromium.chrome.browser.feedback.FeedbackPolicyManager;
+ import org.chromium.chrome.browser.feedback.HelpAndFeedbackLauncherFactory;
+ import org.chromium.chrome.browser.glic.GlicEnabling;
+ import org.chromium.chrome.browser.glic.GlicUtils;
+@@ -279,16 +278,8 @@ public class TabStripContextMenuCoordina
+                             .withIsIncognito(isIncognito)
+                             .withEnabled(enabled)
+                             .build());
+-
+-            // Add "Send feedback" option
+-            if (FeedbackPolicyManager.getInstance().isUserFeedbackAllowed()) {
+-                itemList.add(
+-                        new ListItemBuilder()
+-                                .withTitleRes(R.string.send_feedback_about_tab_strip)
+-                                .withMenuId(R.id.send_feedback_about_tab_strip_menu_id)
+-                                .withIsIncognito(isIncognito)
+-                                .build());
+-            }
++            // No "Send feedback about the tab strip": it hands off to Google's feedback service,
++            // which this browser does not ship.
+         }
+         // Add "Task Manager" option with divider.
+         if (TaskManager.isEnabled()) {
 --- a/chrome/android/java/src/org/chromium/chrome/browser/settings/ExperimentalTabsSettings.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/ExperimentalTabsSettings.java
 @@ -20,6 +20,7 @@ import org.chromium.chrome.browser.compo
@@ -228,22 +1052,30 @@
  import org.chromium.chrome.browser.ui.messages.snackbar.Snackbar;
  import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
  import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager.SnackbarManageable;
-@@ -37,6 +38,8 @@ public class ExperimentalTabsSettings ex
+@@ -37,6 +38,9 @@ public class ExperimentalTabsSettings ex
      static final String PREF_DARK_TAB_STRIP = "dark_tab_strip_switch";
      static final String PREF_TAB_STACKING = "tab_stacking_pref";
      static final String PREF_MIN_TAB_WIDTH = "min_tab_width_pref";
 +    static final String PREF_VERTICAL_TABS = "vertical_tabs_switch";
 +    static final String PREF_VERTICAL_TABS_WIDTH = "vertical_tabs_width_pref";
++    static final String PREF_VERTICAL_TABS_SHOW_CLOSE = "vertical_tabs_show_close_switch";
  
      private final SettableMonotonicObservableSupplier<String> mPageTitle =
              ObservableSuppliers.createMonotonic();
-@@ -58,6 +61,30 @@ public class ExperimentalTabsSettings ex
+@@ -58,6 +62,37 @@ public class ExperimentalTabsSettings ex
          bind(PREF_DARK_TAB_STRIP, ChromePreferenceKeys.FLAGS_DARK_TAB_STRIP_ENABLED, false, false);
          bindTabStackingMode();
          bindMinTabWidth();
 +        // Vertical tabs replace the strip with a rail beside the page; the layout is chosen when
 +        // the activity builds its UI, so the change takes a relaunch.
 +        bind(PREF_VERTICAL_TABS, ChromePreferenceKeys.VERTICAL_TABS_ENABLED, false, true);
++        // Rail rows are only rebound when their tab changes, so a relaunch is what makes this
++        // show up across the whole list at once.
++        bind(
++                PREF_VERTICAL_TABS_SHOW_CLOSE,
++                ChromePreferenceKeys.VERTICAL_TABS_SHOW_CLOSE,
++                true,
++                true);
 +        bindVerticalTabsWidth();
 +    }
 +
@@ -270,26 +1102,336 @@
      private void bindMinTabWidth() {
 --- a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java
-@@ -2384,6 +2384,19 @@ public class TabbedRootUiCoordinator ext
+@@ -18,6 +18,7 @@ import android.os.Bundle;
+ import android.os.Handler;
+ import android.os.PersistableBundle;
+ import android.text.TextUtils;
++import android.view.MotionEvent;
+ import android.view.View;
+ import android.view.ViewGroup;
+ import android.view.ViewStub;
+@@ -56,11 +57,11 @@ import org.chromium.build.annotations.En
+ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.build.annotations.Nullable;
+ import org.chromium.chrome.R;
+-import org.chromium.chrome.browser.ActivityTabProvider;
+ import org.chromium.chrome.browser.ActivityTabProvider.ActivityTabTabObserver;
++import org.chromium.chrome.browser.ActivityTabProvider;
+ import org.chromium.chrome.browser.ChromeActivitySessionTracker;
+-import org.chromium.chrome.browser.ChromeInactivityTracker;
+ import org.chromium.chrome.browser.ChromeInactivityTracker.InactivityObserver;
++import org.chromium.chrome.browser.ChromeInactivityTracker;
+ import org.chromium.chrome.browser.SwipeRefreshHandler;
+ import org.chromium.chrome.browser.accessibility.PageZoomIphController;
+ import org.chromium.chrome.browser.actor.ui.ActorOverlayCoordinator;
+@@ -74,8 +75,8 @@ import org.chromium.chrome.browser.bookm
+ import org.chromium.chrome.browser.bookmarks.TabBookmarker;
+ import org.chromium.chrome.browser.bookmarks.bar.BookmarkBarCoordinator;
+ import org.chromium.chrome.browser.bookmarks.bar.BookmarkBarUtils;
+-import org.chromium.chrome.browser.bookmarks.bar.BookmarkBarVisibilityProvider;
+ import org.chromium.chrome.browser.bookmarks.bar.BookmarkBarVisibilityProvider.BookmarkBarVisibilityObserver;
++import org.chromium.chrome.browser.bookmarks.bar.BookmarkBarVisibilityProvider;
+ import org.chromium.chrome.browser.browser_controls.BottomOverscrollHandler;
+ import org.chromium.chrome.browser.collaboration.CollaborationControllerDelegateFactory;
+ import org.chromium.chrome.browser.collaboration.CollaborationControllerDelegateImpl;
+@@ -142,13 +143,13 @@ import org.chromium.chrome.browser.lifet
+ import org.chromium.chrome.browser.locale.LocaleManager;
+ import org.chromium.chrome.browser.metrics.UmaSessionStats;
+ import org.chromium.chrome.browser.multiwindow.MultiInstanceIphController;
+-import org.chromium.chrome.browser.multiwindow.MultiInstanceManager;
+ import org.chromium.chrome.browser.multiwindow.MultiInstanceManager.PersistedInstanceType;
++import org.chromium.chrome.browser.multiwindow.MultiInstanceManager;
+ import org.chromium.chrome.browser.multiwindow.MultiWindowUtils;
+ import org.chromium.chrome.browser.multiwindow.TabbedCrashRecoveryDelegate;
+ import org.chromium.chrome.browser.night_mode.WebContentsDarkModeMessageController;
+-import org.chromium.chrome.browser.notifications.permissions.NotificationPermissionController;
+ import org.chromium.chrome.browser.notifications.permissions.NotificationPermissionController.RationaleDelegate;
++import org.chromium.chrome.browser.notifications.permissions.NotificationPermissionController;
+ import org.chromium.chrome.browser.notifications.permissions.NotificationPermissionRationaleDialogController;
+ import org.chromium.chrome.browser.notifications.tips.TipsOptInCoordinator;
+ import org.chromium.chrome.browser.notifications.tips.TipsUtils;
+@@ -184,8 +185,8 @@ import org.chromium.chrome.browser.share
+ import org.chromium.chrome.browser.signin.SigninAndHistorySyncActivityLauncherImpl;
+ import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
+ import org.chromium.chrome.browser.signin.services.SigninManager;
+-import org.chromium.chrome.browser.status_indicator.StatusIndicatorCoordinator;
+ import org.chromium.chrome.browser.status_indicator.StatusIndicatorCoordinator.StatusIndicatorObserver;
++import org.chromium.chrome.browser.status_indicator.StatusIndicatorCoordinator;
+ import org.chromium.chrome.browser.subscriptions.CommerceSubscriptionsService;
+ import org.chromium.chrome.browser.subscriptions.CommerceSubscriptionsServiceFactory;
+ import org.chromium.chrome.browser.sync.synced_set_up.CrossDeviceSettingImporter;
+@@ -223,6 +224,7 @@ import org.chromium.chrome.browser.tasks
+ import org.chromium.chrome.browser.tasks.tab_management.vertical_tabs.VerticalTabListCoordinator;
+ import org.chromium.chrome.browser.tasks.tab_management.vertical_tabs.VerticalTabsActionDelegate;
+ import org.chromium.chrome.browser.tasks.tab_management.vertical_tabs.VerticalTabsSideUiCoordinator;
++import org.chromium.chrome.browser.toolbar.MenuBuilderHelper;
+ import org.chromium.chrome.browser.toolbar.ToolbarButtonInProductHelpController;
+ import org.chromium.chrome.browser.toolbar.ToolbarFeatures;
+ import org.chromium.chrome.browser.toolbar.ToolbarIntentMetadata;
+@@ -268,17 +270,19 @@ import org.chromium.chrome.browser.ui.si
+ import org.chromium.chrome.browser.ui.signin.FullscreenSigninPromoLauncher;
+ import org.chromium.chrome.browser.ui.system.StatusBarColorController.StatusBarColorProvider;
+ import org.chromium.chrome.browser.ui.vertical_tabs.VerticalTabUtils;
+-import org.chromium.chrome.browser.user_education.UserEducationUtils;
+ import org.chromium.chrome.browser.user_education.UserEducationUtils.OptionalPromoType;
++import org.chromium.chrome.browser.user_education.UserEducationUtils;
+ import org.chromium.chrome.browser.webapps.PwaRestorePromoUtils;
+ import org.chromium.components.browser_ui.accessibility.PageZoomUtils;
+ import org.chromium.components.browser_ui.bottomsheet.EmptyBottomSheetObserver;
++import org.chromium.components.browser_ui.widget.BrowserUiListMenuUtils;
+ import org.chromium.components.browser_ui.widget.CoordinatorLayoutForPointer;
++import org.chromium.components.browser_ui.widget.ListItemBuilder;
+ import org.chromium.components.browser_ui.widget.MenuOrKeyboardActionController;
+ import org.chromium.components.browser_ui.widget.TouchEventObserver;
+ import org.chromium.components.browser_ui.widget.loading.LoadingFullscreenCoordinator;
+-import org.chromium.components.browser_ui.widget.scrim.ScrimManager;
+ import org.chromium.components.browser_ui.widget.scrim.ScrimManager.ScrimClient;
++import org.chromium.components.browser_ui.widget.scrim.ScrimManager;
+ import org.chromium.components.collaboration.CollaborationService;
+ import org.chromium.components.embedder_support.contextmenu.ContextMenuPopulatorFactory;
+ import org.chromium.components.embedder_support.util.UrlUtilities;
+@@ -310,7 +314,12 @@ import org.chromium.ui.edge_to_edge.Edge
+ import org.chromium.ui.edge_to_edge.EdgeToEdgeStateProvider;
+ import org.chromium.ui.edge_to_edge.SystemBarColorHelper;
+ import org.chromium.ui.insets.InsetObserver;
++import org.chromium.ui.listmenu.ListMenu;
++import org.chromium.ui.listmenu.ListMenuButton;
++import org.chromium.ui.listmenu.ListMenuDelegate;
+ import org.chromium.ui.modaldialog.ModalDialogManager;
++import org.chromium.ui.modelutil.MVCListAdapter;
++import org.chromium.ui.widget.RectProvider;
+ import org.chromium.ui.widget.ViewRectProvider;
+ import org.chromium.url.GURL;
+ 
+@@ -413,6 +422,7 @@ public class TabbedRootUiCoordinator ext
+     private @Nullable GlicUiCoordinator mGlicUiCoordinator;
+     private @Nullable ForcedSigninController mForcedSigninController;
+     private @Nullable VerticalTabsSideUiCoordinator mVerticalTabsSideUiCoordinator;
++    private @Nullable TouchEventObserver mVerticalTabsResizeTouchObserver;
+     private @Nullable TabSearchOverlayCoordinator mTabSearchOverlayCoordinator;
+     private final VerticalTabsActionDelegate mVerticalTabsActionDelegate;
+ 
+@@ -837,6 +847,12 @@ public class TabbedRootUiCoordinator ext
+             PwaBottomSheetControllerFactory.detach(mPwaBottomSheetController);
+         }
+ 
++        if (mVerticalTabsResizeTouchObserver != null) {
++            var holder = mCompositorViewHolderSupplier.get();
++            if (holder != null) holder.removeTouchEventObserver(mVerticalTabsResizeTouchObserver);
++            mVerticalTabsResizeTouchObserver = null;
++        }
++
+         if (mHistoryNavigationCoordinator != null) {
+             TouchEventObserver obs = mHistoryNavigationCoordinator.getTouchEventObserver();
+             var compositorViewHolder = mCompositorViewHolderSupplier.get();
+@@ -2384,6 +2400,29 @@ public class TabbedRootUiCoordinator ext
                                      mUndoGroupSnackbarController),
                              mIsVerticalTabsActiveSupplier);
              mSideUiCoordinator.registerSideUiContainer(mVerticalTabsSideUiCoordinator);
 +
 +            // The rail disappears entirely when collapsed, so the control that brings it back
 +            // lives in the toolbar rather than inside the rail.
-+            View verticalTabsButton = mActivity.findViewById(R.id.vertical_tabs_button);
-+            if (verticalTabsButton != null && VerticalTabUtils.isVerticalTabsEnabled(mActivity)) {
++            ListMenuButton verticalTabsButton = mActivity.findViewById(R.id.vertical_tabs_button);
++            if (verticalTabsButton != null) {
 +                verticalTabsButton.setOnClickListener(
 +                        v -> {
 +                            if (mVerticalTabsSideUiCoordinator != null) {
 +                                mVerticalTabsSideUiCoordinator.toggleRail();
 +                            }
 +                        });
-+                verticalTabsButton.setVisibility(View.VISIBLE);
++                setUpVerticalTabsButtonMenu(verticalTabsButton);
++                observePageTouchesToLeaveResizeMode();
++                // Vertical tabs are switched on and off from settings without a relaunch, so the
++                // button follows the rail rather than the state the browser started in.
++                mIsVerticalTabsActiveSupplier.addSyncObserverAndCallIfNonNull(
++                        active -> {
++                            verticalTabsButton.setVisibility(active ? View.VISIBLE : View.GONE);
++                            if (!active && mVerticalTabsSideUiCoordinator != null) {
++                                mVerticalTabsSideUiCoordinator.hideResizeGuide();
++                            }
++                        });
 +            }
              if (mToolbarManager != null) {
                  mToolbarManager.setVerticalTabsAutoHiddenSupplier(
                          mVerticalTabsSideUiCoordinator.getIsAutoHiddenSupplier());
+@@ -2423,6 +2462,131 @@ public class TabbedRootUiCoordinator ext
+     }
+ 
+     @SuppressWarnings("UseSharedPreferencesManagerFromChromeCheck")
++    /**
++     * Gives the toolbar's vertical tabs button a long press menu, the way the home button offers
++     * "Edit homepage". The entry marks the rail's draggable edge rather than opening settings, so
++     * the width can be set by hand right where it is being judged, and marks it again to put the
++     * edge back out of reach.
++     */
++    /** Leaves rail width-editing when a press lands on the page instead of the rail's edge. */
++    private void observePageTouchesToLeaveResizeMode() {
++        CompositorViewHolder compositorViewHolder = mCompositorViewHolderSupplier.get();
++        if (compositorViewHolder == null) return;
++        mVerticalTabsResizeTouchObserver =
++                new TouchEventObserver() {
++                    private boolean mSwallowingSequence;
++
++                    @Override
++                    public boolean mayInterceptTouchSequenceInWebContents() {
++                        return true;
++                    }
++
++                    @Override
++                    public boolean onInterceptTouchEvent(MotionEvent e) {
++                        if (mVerticalTabsSideUiCoordinator == null) return false;
++                        // A press just past the rail's border still grabs it, so aiming at the
++                        // border does not have to be pixel perfect.
++                        if (mVerticalTabsSideUiCoordinator.handleBorderTouch(e)) return true;
++                        // While the rail's edge is being dragged, nothing else in the browser
++                        // should act on the touch stream: page scrolls and back-swipes used to
++                        // fire underneath the drag and leave the window in a mess.
++                        if (mVerticalTabsSideUiCoordinator.isResizingWidth()) return true;
++
++                        int action = e.getActionMasked();
++                        if (action == MotionEvent.ACTION_DOWN
++                                && mVerticalTabsSideUiCoordinator.isResizeGuideVisible()) {
++                            // This press is what leaves width-editing, so it should do that and
++                            // nothing else.
++                            mVerticalTabsSideUiCoordinator.hideResizeGuide();
++                            mSwallowingSequence = true;
++                            return true;
++                        }
++                        if (mSwallowingSequence) {
++                            if (action == MotionEvent.ACTION_UP
++                                    || action == MotionEvent.ACTION_CANCEL) {
++                                mSwallowingSequence = false;
++                            }
++                            return true;
++                        }
++                        return false;
++                    }
++
++                    @Override
++                    public boolean onTouchEvent(MotionEvent e) {
++                        if (mVerticalTabsSideUiCoordinator == null) return false;
++                        if (mVerticalTabsSideUiCoordinator.handleBorderTouch(e)) return true;
++                        return mVerticalTabsSideUiCoordinator.isResizingWidth()
++                                || mSwallowingSequence;
++                    }
++                };
++        compositorViewHolder.addTouchEventObserver(mVerticalTabsResizeTouchObserver);
++
++        // Take the history navigation gesture out of the picture for as long as the rail's width
++        // is being edited. Swallowing its touches part-way through was not enough: once a back
++        // transition has begun, cutting it off leaves its animator checking a navigation state it
++        // never expects and the browser goes down with it.
++        assumeNonNull(mVerticalTabsSideUiCoordinator)
++                .setResizeGuideObserver(
++                        editing -> {
++                            if (mHistoryNavigationCoordinator == null) return;
++                            TouchEventObserver historyObserver =
++                                    mHistoryNavigationCoordinator.getTouchEventObserver();
++                            var holder = mCompositorViewHolderSupplier.get();
++                            if (historyObserver == null || holder == null) return;
++                            if (editing) {
++                                holder.removeTouchEventObserver(historyObserver);
++                            } else {
++                                holder.addTouchEventObserver(historyObserver);
++                            }
++                        });
++    }
++
++    private void setUpVerticalTabsButtonMenu(ListMenuButton button) {
++        button.setDelegate(
++                new ListMenuDelegate() {
++                    private @Nullable ListMenu mListMenu;
++                    private @Nullable RectProvider mRectProvider;
++
++                    @Override
++                    public ListMenu getListMenu() {
++                        if (mListMenu == null) {
++                            MVCListAdapter.ModelList items = new MVCListAdapter.ModelList();
++                            items.add(
++                                    new ListItemBuilder()
++                                            .withTitleRes(R.string.vertical_tabs_edit_title)
++                                            .withMenuId(R.id.vertical_tabs_button)
++                                            .withStartIconRes(R.drawable.ic_edit_24dp)
++                                            .build());
++                            mListMenu =
++                                    BrowserUiListMenuUtils.getBasicListMenu(
++                                            mActivity,
++                                            items,
++                                            (model, position) -> {
++                                                if (mVerticalTabsSideUiCoordinator != null) {
++                                                    mVerticalTabsSideUiCoordinator
++                                                            .toggleResizeGuide();
++                                                }
++                                            });
++                        }
++                        return mListMenu;
++                    }
++
++                    @Override
++                    public RectProvider getRectProvider(View listMenuButton) {
++                        if (mRectProvider == null) {
++                            mRectProvider = MenuBuilderHelper.getRectProvider(listMenuButton);
++                        }
++                        return mRectProvider;
++                    }
++                },
++                /* overrideOnClickListener= */ false);
++        button.setOnLongClickListener(
++                view -> {
++                    ((ListMenuButton) view).showMenu();
++                    return true;
++                });
++    }
++
+     private void maybeInitializeVerticalTabs(Profile profile) {
+         if (!VerticalTabUtils.isVerticalTabsEligible(mActivity)) return;
+ 
+--- a/chrome/android/java/src/org/chromium/chrome/browser/toolbar/ToolbarManager.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/toolbar/ToolbarManager.java
+@@ -310,6 +310,7 @@ public class ToolbarManager
+     private final ToolbarControlContainer mControlContainer;
+     private final View mToolbarHairline;
+     private final BrowserControlsStateProvider.Observer mBrowserControlsObserver;
++    private final OnLayoutChangeListener mControlContainerHeightListener;
+     private final FullscreenManager.Observer mFullscreenObserver;
+     private final SettableNonNullObservableSupplier<Boolean> mHomepageEnabledSupplier =
+             ObservableSuppliers.createNonNull(false);
+@@ -1714,6 +1715,18 @@ public class ToolbarManager
+                 };
+         mBrowserControlsSizer.addObserver(mBrowserControlsObserver);
+ 
++        // The margin above is recomputed only on offset changes. A tab strip height transition
++        // made while the activity is stopped (vertical tabs turned off from settings) lays the
++        // container out only once it is visible again, and on a native page no offset change
++        // follows -- the margin stayed sized for the old height and doubled the toolbar.
++        mControlContainerHeightListener =
++                (view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
++                    if (bottom - top == oldBottom - oldTop) return;
++                    if (mControlContainer.getBackground() != null) return;
++                    setControlContainerTopMargin(getToolbarExtraYOffset());
++                };
++        mControlContainer.addOnLayoutChangeListener(mControlContainerHeightListener);
++
+         mFullscreenObserver =
+                 new FullscreenManager.Observer() {
+                     @Override
+@@ -1928,6 +1941,8 @@ public class ToolbarManager
+         @Override
+         public @Nullable Transition onPreSideUiSpecsChange(SideUiSpecs sideUiSpecs) {
+             Transition transition = super.onPreSideUiSpecsChange(sideUiSpecs);
++            // Nothing to animate means nothing to lay out early either.
++            if (transition == null) return null;
+             super.triggerSynchronousMeasureAndLayout();
+             return transition;
+         }
+@@ -2976,6 +2991,7 @@ public class ToolbarManager
+         mLocationBarModel.destroy();
+         mHandler.removeCallbacksAndMessages(null); // Cancel delayed tasks.
+         mBrowserControlsSizer.removeObserver(mBrowserControlsObserver);
++        mControlContainer.removeOnLayoutChangeListener(mControlContainerHeightListener);
+         mFullscreenManager.removeObserver(mFullscreenObserver);
+ 
+         if (mToolbarThemeColorProvider != null) {
 --- a/chrome/browser/flags/android/chrome_feature_list.cc
 +++ b/chrome/browser/flags/android/chrome_feature_list.cc
 @@ -635,7 +635,7 @@ BASE_FEATURE(kAndroidTabstripStartupCapt
@@ -312,9 +1454,33 @@
                      /* defaultValueInTests= */ true);
      public static final CachedFlag sAndroidWindowManagementWebApi =
              newCachedFlag(
+--- a/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
++++ b/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
+@@ -463,6 +463,10 @@ public final class ChromePreferenceKeys
+     public static final String FLAGS_DARK_TAB_STRIP_ENABLED = "dark_tab_strip_enabled";
+     public static final String FLAGS_TAB_STACKING_MODE = "tab_stacking_style";
+     public static final String FLAGS_MIN_TAB_WIDTH = "minimum_tab_width";
++    public static final String VERTICAL_TABS_WIDTH = "vertical_tabs_width";
++
++    /** Whether each row in the vertical tab rail carries a close button. */
++    public static final String VERTICAL_TABS_SHOW_CLOSE = "vertical_tabs_show_close";
+ 
+     /** Keys used to save settings related to homepage. */
+     public static final String DEPRECATED_HOMEPAGE_CUSTOM_URI = "homepage_custom_uri";
+--- a/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/LegacyChromePreferenceKeys.java
++++ b/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/LegacyChromePreferenceKeys.java
+@@ -62,6 +62,8 @@ public class LegacyChromePreferenceKeys
+                 ChromePreferenceKeys.FLAGS_DARK_TAB_STRIP_ENABLED,
+                 ChromePreferenceKeys.FLAGS_TAB_STACKING_MODE,
+                 ChromePreferenceKeys.FLAGS_MIN_TAB_WIDTH,
++                ChromePreferenceKeys.VERTICAL_TABS_WIDTH,
++                ChromePreferenceKeys.VERTICAL_TABS_SHOW_CLOSE,
+                 ChromePreferenceKeys.FIRST_RUN_SKIP_WELCOME_PAGE,
+                 ChromePreferenceKeys.HISTORY_SHOW_HISTORY_INFO,
+                 ChromePreferenceKeys.HOMEPAGE_ENABLED,
 --- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
 +++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
-@@ -653,6 +653,12 @@ For more settings that use data to impro
+@@ -653,6 +653,18 @@ For more settings that use data to impro
        <message name="IDS_TAB_STACK_TAB_COUNT" desc="Label shown on the tab strip entry that stands for a collapsed tab stack, giving the number of tabs it holds.">
          <ph name="COUNT">%1$d<ex>3</ex></ph> tabs
        </message>
@@ -324,16 +1490,22 @@
 +      <message name="IDS_VERTICAL_TABS_TITLE" desc="Title of the preference that shows the tabs in a vertical rail beside the page instead of a strip above it.">
 +        Vertical tabs
 +      </message>
++      <message name="IDS_VERTICAL_TABS_SHOW_CLOSE_TITLE" desc="Title of the preference that shows a close button on each row of the vertical tab rail.">
++        Show X button in vertical tabs
++      </message>
++      <message name="IDS_VERTICAL_TABS_EDIT_TITLE" desc="Menu item shown when long pressing the vertical tabs button, which opens the tab settings.">
++        Edit tabs
++      </message>
        <message name="IDS_MIN_TAB_WIDTH_TITLE" desc="Title of the preference setting the narrowest a tab may become in the tab strip, in density-independent pixels.">
          Minimum tab width
        </message>
 --- a/chrome/browser/ui/android/toolbar/java/res/layout/toolbar_phone.xml
 +++ b/chrome/browser/ui/android/toolbar/java/res/layout/toolbar_phone.xml
-@@ -14,6 +14,17 @@ found in the LICENSE file.
+@@ -14,6 +14,20 @@ found in the LICENSE file.
      android:layout_height="@dimen/toolbar_height_no_shadow"
      android:minHeight="@dimen/toolbar_height_no_shadow">
  
-+    <ImageButton
++    <org.chromium.ui.listmenu.ListMenuButton
 +        android:id="@+id/vertical_tabs_button"
 +        style="@style/ToolbarHoverableButton"
 +        android:layout_width="@dimen/vertical_tabs_button_width"
@@ -342,6 +1514,9 @@
 +        android:contentDescription="@string/accessibility_expand_vertical_tabs"
 +        android:tooltipText="@string/accessibility_expand_vertical_tabs"
 +        android:visibility="gone"
++        app:menuVerticalOverlapAnchor="false"
++        app:menuMaxWidth="@dimen/home_button_list_menu_width"
++        app:menuPositionedAtStart="true"
 +        app:tint="@color/default_icon_color_tint_list"/>
 +
      <org.chromium.chrome.browser.toolbar.home_button.HomeButton
@@ -355,6 +1530,115 @@
      <dimen name="extension_action_hover_card_vertical_padding" tools:ignore="UnusedResources">12dp</dimen>
 +    <dimen name="vertical_tabs_button_width">48dp</dimen>
  </resources>
+--- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/ControlContainer.java
++++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/ControlContainer.java
+@@ -50,6 +50,14 @@ public interface ControlContainer extend
+     int getToolbarHairlineHeight();
+ 
+     /**
++     * Whether the toolbar sits at the bottom of the window. The tab strip then stays at the top,
++     * outside this container, and must not be given room in it.
++     */
++    default boolean isToolbarAtBottom() {
++        return false;
++    }
++
++    /**
+      * @param handler The swipe handler to be notified of swipe events on this container.
+      */
+     void setSwipeHandler(SwipeHandler handler);
+--- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/top/ToolbarControlContainer.java
++++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/top/ToolbarControlContainer.java
+@@ -52,6 +52,7 @@ import org.chromium.build.annotations.Nu
+ import org.chromium.build.annotations.Nullable;
+ import org.chromium.cc.input.BrowserControlsState;
+ import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
++import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider.ControlsPosition;
+ import org.chromium.chrome.browser.browser_controls.BrowserStateBrowserControlsVisibilityDelegate;
+ import org.chromium.chrome.browser.flags.ChromeFeatureList;
+ import org.chromium.chrome.browser.fullscreen.FullscreenManager;
+@@ -132,6 +133,20 @@ public class ToolbarControlContainer ext
+     private ToolbarDataProvider mToolbarDataProvider;
+     private @Nullable DesktopWindowStateManager mDesktopWindowStateManager;
+     private @Nullable NonNullObservableSupplier<Boolean> mIsVerticalTabsActiveSupplier;
++    private @Nullable BrowserControlsStateProvider mControlsStateProvider;
++    // A tab strip transition made with the toolbar on top leaves a hairline margin and minimum
++    // height that count the strip; once the toolbar moves to the bottom they would reappear as a
++    // blank band under it.
++    private final BrowserControlsStateProvider.Observer mControlsPositionObserver =
++            new BrowserControlsStateProvider.Observer() {
++                @Override
++                public void onControlsPositionChanged(@ControlsPosition int controlsPosition) {
++                    int toolbarAndTabStripHeight =
++                            getTabStripHeightInContainer() + getToolbarHeight();
++                    mutateHairlineLayoutParams().topMargin = toolbarAndTabStripHeight;
++                    setMinimumHeight(toolbarAndTabStripHeight + getToolbarHairlineHeight());
++                }
++            };
+     private @Nullable View mTopLeftCornerOverlayView;
+     private @Nullable StringBuilder mMeasureLogBuilder;
+     private @Nullable Callback<Integer> mToolbarRightMarginCallback;
+@@ -356,6 +371,9 @@ public class ToolbarControlContainer ext
+     @Override
+     public void destroy() {
+         ((ToolbarViewResourceAdapter) getToolbarResourceAdapter()).destroy();
++        if (mControlsStateProvider != null) {
++            mControlsStateProvider.removeObserver(mControlsPositionObserver);
++        }
+         if (mXrSpaceModeObservableSupplier != null) {
+             mXrSpaceModeObservableSupplier.removeObserver(mOnXrSpaceModeChanged);
+         }
+@@ -382,14 +400,27 @@ public class ToolbarControlContainer ext
+         mMidVisibilityToggle = false;
+     }
+ 
++    @Override
++    public boolean isToolbarAtBottom() {
++        return mControlsStateProvider != null
++                && mControlsStateProvider.getControlsPosition() == ControlsPosition.BOTTOM;
++    }
++
++    /** The part of the tab strip's height that this container makes room for. */
++    private int getTabStripHeightInContainer() {
++        return isToolbarAtBottom() ? 0 : mTabStripHeight;
++    }
++
+     // implements TabStripTransitionDelegate
+     @Override
+     public void onHeightChanged(int tabStripHeight, int topPadding, boolean applyScrimOverlay) {
+         mTabStripHeight = tabStripHeight;
+         mTabStripTopPadding = topPadding;
+-        mutateToolbarLayoutParams().topMargin = tabStripHeight;
+-
+-        int toolbarAndTabStripHeight = tabStripHeight + getToolbarHeight();
++        int toolbarAndTabStripHeight = getTabStripHeightInContainer() + getToolbarHeight();
++        // A bottom toolbar keeps the top margin ToolbarPositionController gave it: the strip stays
++        // at the top of the window, and pushing the toolbar down by its height left a blank band
++        // above the toolbar and cut the page short.
++        if (!isToolbarAtBottom()) mutateToolbarLayoutParams().topMargin = tabStripHeight;
+         mutateHairlineLayoutParams().topMargin = toolbarAndTabStripHeight;
+         if (!applyScrimOverlay) {
+             setMinimumHeight(toolbarAndTabStripHeight + getToolbarHairlineHeight());
+@@ -520,8 +551,9 @@ public class ToolbarControlContainer ext
+         new Handler()
+                 .post(
+                         () -> {
++                            // A bottom toolbar leaves the strip at the top of the window.
+                             int minHeight =
+-                                    mToolbar.getTabStripHeight()
++                                    (isToolbarAtBottom() ? 0 : mToolbar.getTabStripHeight())
+                                             + getToolbarHeight()
+                                             + getToolbarHairlineHeight();
+                             if (ChromeFeatureList.sDebugToolbarPositioning.isEnabled()) {
+@@ -633,6 +665,8 @@ public class ToolbarControlContainer ext
+             @Nullable DesktopWindowStateManager desktopWindowStateManager) {
+         mToolbar = toolbar;
+         mIncognito = isIncognito;
++        mControlsStateProvider = browserControlsStateProvider;
++        mControlsStateProvider.addObserver(mControlsPositionObserver);
+         mToolbarDataProvider = toolbarDataProvider;
+         mToolbarDataProvider.addToolbarDataProviderObserver(this);
+         mDesktopWindowStateManager = desktopWindowStateManager;
 --- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/top/ToolbarPhone.java
 +++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/top/ToolbarPhone.java
 @@ -166,6 +166,8 @@ public class ToolbarPhone extends Toolba
@@ -506,6 +1790,19 @@
          if (getTabSwitcherButtonCoordinator() != null) {
              animator =
                      ObjectAnimator.ofFloat(
+--- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/top/tab_strip/HeightTransitionHandler.java
++++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/top/tab_strip/HeightTransitionHandler.java
+@@ -250,8 +250,9 @@ class HeightTransitionHandler {
+         // controls start changing its height, as it assumed a fixed size control container during
+         // transition. See b/324178484.
+         int tabStripHeight = showTabStrip ? calculateTabStripHeight() : 0;
++        // A bottom toolbar leaves the strip at the top of the window, outside the container.
+         int maxHeight =
+-                tabStripHeight
++                (mControlContainer.isToolbarAtBottom() ? 0 : tabStripHeight)
+                         + mControlContainer.getToolbarHeight()
+                         + mControlContainer.getToolbarHairlineHeight();
+         controlContainerView().setMinimumHeight(maxHeight);
 --- a/chrome/browser/ui/side_ui/internal/android/java/src/org/chromium/chrome/browser/ui/side_ui/SideUiCoordinatorImpl.java
 +++ b/chrome/browser/ui/side_ui/internal/android/java/src/org/chromium/chrome/browser/ui/side_ui/SideUiCoordinatorImpl.java
 @@ -44,6 +44,7 @@ import org.chromium.chrome.browser.lifec
@@ -516,7 +1813,15 @@
  import org.chromium.ui.base.ViewUtils;
  
  import java.util.ArrayList;
-@@ -267,7 +268,7 @@ final class SideUiCoordinatorImpl
+@@ -59,7 +60,6 @@ final class SideUiCoordinatorImpl
+                 BrowserControlsStateProvider.Observer,
+                 FullscreenManager.Observer {
+ 
+-    private static final long TRANSITION_DURATION_MS = 350L;
+ 
+     private final Activity mParentActivity;
+     private final ActivityLifecycleDispatcher mActivityLifecycleDispatcher;
+@@ -267,7 +267,7 @@ final class SideUiCoordinatorImpl
      public boolean canShowSideUi(@SideUiId int sideUiId) {
          ThreadUtils.assertOnUiThread();
          @Px int windowWidth = getWindowWidth();
@@ -525,7 +1830,21 @@
          boolean isFullscreen = mFullscreenManager.getPersistentFullscreenMode();
          var sideUiShowability =
                  determineSideUiShowability(windowWidth, minWebContentsWidth, isFullscreen);
-@@ -407,7 +408,7 @@ final class SideUiCoordinatorImpl
+@@ -320,6 +320,13 @@ final class SideUiCoordinatorImpl
+     }
+ 
+     @Override
++    public void onBottomControlsHeightChanged(
++            int bottomControlsHeight, int bottomControlsMinHeight) {
++        updateAnchorContainerBottomMargins();
++        updateUiInternal(new UiUpdateRequest(/* sideUiId= */ null, /* suppressAnimations= */ true));
++    }
++
++    @Override
+     public void onControlsOffsetChanged(
+             int topOffset,
+             int topControlsMinHeightOffset,
+@@ -407,7 +414,7 @@ final class SideUiCoordinatorImpl
  
          // 3. Determine the new SideUiShowability, SideUiSpecs, and AnchorContainerTopMargins.
          @Px int windowWidth = getWindowWidth();
@@ -534,7 +1853,33 @@
          boolean isFullscreen = mFullscreenManager.getPersistentFullscreenMode();
          SideUiShowability newSideUiShowability =
                  determineSideUiShowability(windowWidth, minWebContentsWidth, isFullscreen);
-@@ -509,6 +510,15 @@ final class SideUiCoordinatorImpl
+@@ -487,6 +494,25 @@ final class SideUiCoordinatorImpl
+                 : HeightType.WEB_CONTENTS;
+     }
+ 
++    /**
++     * Keeps side UI clear of the bottom browser controls. Only the top margin was ever set, which
++     * was fine while the toolbar was always on top; with the address bar moved to the bottom the
++     * containers ran underneath it and swallowed its leading buttons.
++     */
++    private void updateAnchorContainerBottomMargins() {
++        @Px
++        int bottomMargin =
++                mFullscreenManager.getPersistentFullscreenMode()
++                        ? 0
++                        : mBrowserControlsStateProvider.getBottomControlsHeight();
++        for (ViewGroup anchorContainer : mAnchorContainers.values()) {
++            var layoutParams = (MarginLayoutParams) anchorContainer.getLayoutParams();
++            if (layoutParams.bottomMargin == bottomMargin) continue;
++            layoutParams.bottomMargin = bottomMargin;
++            anchorContainer.setLayoutParams(layoutParams);
++        }
++    }
++
+     private AnchorContainerTopMargins getCurrentAnchorContainerTopMargins() {
+         Map<@AnchorSide Integer, Integer> topMargins = new ArrayMap<>();
+         for (Map.Entry<@AnchorSide Integer, ViewGroup> entry : mAnchorContainers.entrySet()) {
+@@ -509,6 +535,15 @@ final class SideUiCoordinatorImpl
       * @param isFullscreen Whether the app is in persistent fullscreen mode.
       * @return The new {@link SideUiShowability}.
       */
@@ -550,14 +1895,131 @@
      private SideUiShowability determineSideUiShowability(
              @Px int windowWidth, @Px int minWebContentsWidth, boolean isFullscreen) {
          int availableWidth = windowWidth - minWebContentsWidth;
+@@ -612,10 +647,15 @@ final class SideUiCoordinatorImpl
+     private TransitionSet collectTransitions(SideUiUpdateSpecs uiUpdateSpecs) {
+         // Rather than use a standard Android or Material interpolator, we instead match the desktop
+         // impl's curve found at chrome/browser/ui/views/animations/side_panel_animations.cc.
+-        TimeInterpolator interpolator = PathInterpolatorCompat.create(0.45f, 0f, 0.12f, 1f);
++        TimeInterpolator interpolator =
++                PathInterpolatorCompat.create(
++                        SideUiCoordinator.TRANSITION_INTERPOLATOR_CONTROL_POINTS[0],
++                        SideUiCoordinator.TRANSITION_INTERPOLATOR_CONTROL_POINTS[1],
++                        SideUiCoordinator.TRANSITION_INTERPOLATOR_CONTROL_POINTS[2],
++                        SideUiCoordinator.TRANSITION_INTERPOLATOR_CONTROL_POINTS[3]);
+         TransitionSet transitionSet =
+                 new TransitionSet()
+-                        .setDuration(TRANSITION_DURATION_MS)
++                        .setDuration(SideUiCoordinator.TRANSITION_DURATION_MS)
+                         .setOrdering(TransitionSet.ORDERING_TOGETHER)
+                         .setInterpolator(interpolator);
+ 
+@@ -652,6 +692,7 @@ final class SideUiCoordinatorImpl
+      */
+     private void commitNewSideUiSpecs(
+             SideUiUpdateSpecs uiUpdateSpecs, @Nullable TransitionSet transitionSet) {
++        updateAnchorContainerBottomMargins();
+         // Whether both the width and height gets updated. The animation will be suppressed if true.
+         boolean willUpdateBothWidthHeight = false;
+         for (var marginDiff : uiUpdateSpecs.mTopMarginDiff.entrySet()) {
+--- a/chrome/browser/ui/side_ui/internal/android/java/src/org/chromium/chrome/browser/ui/side_ui/SideUiWebContentHairlineManager.java
++++ b/chrome/browser/ui/side_ui/internal/android/java/src/org/chromium/chrome/browser/ui/side_ui/SideUiWebContentHairlineManager.java
+@@ -160,20 +160,23 @@ import java.util.Set;
+             boolean isLeftShowing = sideUiSpecs.getWidth(AnchorSide.LEFT) != 0;
+             boolean isVtShowing = mSideUiStateProvider.isSideUiShowing(SideUiId.VERTICAL_TABS);
+ 
+-            int leftHairlineVisibility =
+-                    (isLeftShowing && !isVtShowing) ? View.VISIBLE : View.INVISIBLE;
++            // The rail draws its own border rule, so that it can step aside for the resize
++            // guide; upstream's hairline stays off for it.
+             mSideUiWebContentHairlineContainer
+                     .getLeftHairline()
+-                    .setVisibility(leftHairlineVisibility);
++                    .setVisibility(
++                            (isLeftShowing && !isVtShowing) ? View.VISIBLE : View.INVISIBLE);
+             mSideUiWebContentHairlineContainer
+                     .getTopLeftRoundedCorner()
+-                    .setVisibility(leftHairlineVisibility);
++                    .setVisibility(
++                            (isLeftShowing && !isVtShowing) ? View.VISIBLE : View.INVISIBLE);
+ 
+-            int leftBottomCornerVisibility =
+-                    (isLeftShowing && isVtShowing) ? View.VISIBLE : View.INVISIBLE;
++            // Upstream rounds only the page's bottom-left corner beside the rail, which reads as
++            // a stray dark blob now that the toolbar spans the full width and nothing else is
++            // rounded. Leave the page square.
+             mSideUiWebContentHairlineContainer
+                     .getBottomLeftRoundedCorner()
+-                    .setVisibility(leftBottomCornerVisibility);
++                    .setVisibility(View.INVISIBLE);
+ 
+             int rightHairlineVisibility =
+                     sideUiSpecs.getWidth(AnchorSide.RIGHT) == 0 ? View.INVISIBLE : View.VISIBLE;
+--- a/chrome/browser/ui/side_ui/public/android/java/src/org/chromium/chrome/browser/ui/side_ui/SideUiCoordinator.java
++++ b/chrome/browser/ui/side_ui/public/android/java/src/org/chromium/chrome/browser/ui/side_ui/SideUiCoordinator.java
+@@ -35,6 +35,18 @@ public interface SideUiCoordinator exten
+     int MIN_WEB_CONTENTS_WIDTH_DP = 412;
+ 
+     /**
++     * How long a side UI show, hide or resize takes. Observers that animate alongside the
++     * containers need to match it, so it lives here rather than in the implementation.
++     */
++    long TRANSITION_DURATION_MS = 350L;
++
++    /**
++     * Control points of the curve those transitions run on, matching the desktop side panel
++     * animation in chrome/browser/ui/views/animations/side_panel_animations.cc.
++     */
++    float[] TRANSITION_INTERPOLATOR_CONTROL_POINTS = {0.45f, 0f, 0.12f, 1f};
++
++    /**
+      * The IDs assigned to known {@link SideUiContainer}s listed in descending order of their
+      * priorities by which they consume available space. The smaller number indicates higher
+      * priority.
+--- a/chrome/browser/ui/side_ui/public/android/java/src/org/chromium/chrome/browser/ui/side_ui/ViewMarginAdjusterForSideUi.java
++++ b/chrome/browser/ui/side_ui/public/android/java/src/org/chromium/chrome/browser/ui/side_ui/ViewMarginAdjusterForSideUi.java
+@@ -75,6 +75,15 @@ public class ViewMarginAdjusterForSideUi
+ 
+     @Override
+     public @Nullable Transition onPreSideUiSpecsChange(SideUiCoordinator.SideUiSpecs sideUiSpecs) {
++        // A toolbar element only moves for side UI that reaches up alongside the toolbar. When the
++        // side UI sits below it there is nothing here to animate, and animating anyway puts a
++        // transition over views that run their own -- it left the progress bar stuck on screen
++        // after its fade-out was cut short.
++        if (mForToolbarElement
++                && sideUiSpecs.getHeightType(AnchorSide.LEFT) != HeightType.TOOLBAR
++                && sideUiSpecs.getHeightType(AnchorSide.RIGHT) != HeightType.TOOLBAR) {
++            return null;
++        }
+         TransitionSet transitionSet = new TransitionSet();
+         Collection<View> descendants = new ArrayList<>();
+         ViewUtils.getAllDescendants(mView, descendants, emptySet());
 --- a/chrome/browser/ui/vertical_tabs/android/java/src/org/chromium/chrome/browser/ui/vertical_tabs/VerticalTabUtils.java
 +++ b/chrome/browser/ui/vertical_tabs/android/java/src/org/chromium/chrome/browser/ui/vertical_tabs/VerticalTabUtils.java
-@@ -25,8 +25,29 @@ public class VerticalTabUtils {
+@@ -11,6 +11,7 @@ import androidx.annotation.IntDef;
+ 
+ import org.chromium.base.metrics.RecordHistogram;
+ import org.chromium.build.annotations.NullMarked;
++import org.chromium.build.annotations.Nullable;
+ import org.chromium.chrome.browser.flags.ChromeFeatureList;
+ import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+ import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
+@@ -25,8 +26,80 @@ public class VerticalTabUtils {
      /** The width of the vertical tabs SideUiContainer in dp. */
      public static final int SIDE_UI_CONTAINER_WIDTH_DP = 240;
  
-+    /** Narrowest and widest the rail may be set to from settings. */
-+    public static final int RAIL_WIDTH_MIN_DP = 100;
++    /**
++     * Narrowest the rail may be set to: 4dp of rail padding, the row's 8dp inset, the 24dp
++     * favicon, then the same 8dp and 4dp back out again. That leaves an even halo around the
++     * icon and an even dark margin either side of the row, and keeps the icon centred on 24dp,
++     * where the toolbar's vertical tabs button sits.
++     */
++    public static final int RAIL_WIDTH_MIN_DP = 48;
++
++    /**
++     * Below this the rail has no room for a title beside the favicon, so rows drop everything but
++     * the icon rather than showing a two-letter stub with a close button on top of it.
++     */
++    public static final int RAIL_WIDTH_TITLE_MIN_DP = 100;
 +
 +    /**
 +     * How wide the rail starts out. Upstream's 240dp eats most of a phone window, so default to
@@ -565,7 +2027,47 @@
 +     */
 +    public static final int RAIL_WIDTH_DEFAULT_DP = 160;
 +
++    /** Widest the rail may be set to from settings. */
 +    public static final int RAIL_WIDTH_MAX_DP = 320;
++
++    /**
++     * Width of the grab strip on the rail's outer edge. It only takes touches while the resize
++     * guide is out, so it can be wider than the rule it draws: a fingertip aimed at a 1dp line
++     * needs far more than 1dp of target.
++     */
++    public static final int RAIL_RESIZE_HANDLE_WIDTH_DP = 24;
++
++    /**
++     * How far past the rail's border a press still counts as grabbing it. Aiming at the border
++     * puts half the fingertip on the page, and without this that half missed the rail entirely
++     * and only dismissed the guide.
++     */
++    public static final int RAIL_RESIZE_GRACE_DP = 24;
++
++    /** Whether the rail is too narrow for anything but the favicon. */
++    public static boolean isIconOnlyRail() {
++        return railWidthDp() < RAIL_WIDTH_TITLE_MIN_DP;
++    }
++
++    /** Whether rail rows carry a close button; chosen in Settings > Experimental > Tabs. */
++    public static boolean isCloseButtonShown() {
++        return ChromeSharedPreferences.getInstance()
++                .readBoolean(ChromePreferenceKeys.VERTICAL_TABS_SHOW_CLOSE, true);
++    }
++
++    /** Whether {@code key} is a rail setting that should take effect while the rail is open. */
++    public static boolean isRailAppearanceKey(@Nullable String key) {
++        return ChromePreferenceKeys.VERTICAL_TABS_WIDTH.equals(key)
++                || ChromePreferenceKeys.VERTICAL_TABS_SHOW_CLOSE.equals(key);
++    }
++
++    /** Records a rail width, so a drag on its edge survives the next launch. */
++    public static void setRailWidthDp(int widthDp) {
++        ChromeSharedPreferences.getInstance()
++                .writeInt(
++                        ChromePreferenceKeys.VERTICAL_TABS_WIDTH,
++                        Math.max(RAIL_WIDTH_MIN_DP, Math.min(RAIL_WIDTH_MAX_DP, widthDp)));
++    }
 +
 +    /** How wide the rail shows its tabs, in dp; chosen in Settings > Experimental > Tabs. */
 +    public static int railWidthDp() {
@@ -583,7 +2085,7 @@
  
      /**
       * Minimum window width threshold in dp required to allow expanding vertical tabs rail and
-@@ -34,6 +55,15 @@ public class VerticalTabUtils {
+@@ -34,6 +107,15 @@ public class VerticalTabUtils {
       */
      public static final int MIN_EXPAND_WINDOW_WIDTH_DP = 652;
  
@@ -599,7 +2101,7 @@
      @IntDef({
          LayoutSwitchEntryPoint.APP_MENU,
          LayoutSwitchEntryPoint.TAB_CONTEXT_MENU,
-@@ -85,6 +115,11 @@ public class VerticalTabUtils {
+@@ -85,6 +167,11 @@ public class VerticalTabUtils {
       * AndroidVerticalTabs feature flag to be enabled and the device to be a tablet form factor.
       */
      public static boolean isVerticalTabsEligible(Context context) {
