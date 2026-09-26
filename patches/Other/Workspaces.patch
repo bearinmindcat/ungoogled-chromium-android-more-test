@@ -1,0 +1,3455 @@
+--- a/chrome/android/chrome_java_sources.gni
++++ b/chrome/android/chrome_java_sources.gni
+@@ -1357,6 +1357,7 @@ chrome_java_sources = [
+   "java/src/org/chromium/chrome/browser/webapps/WebappLauncherActivity.java",
+   "java/src/org/chromium/chrome/browser/webapps/WebappRegistry.java",
+   "java/src/org/chromium/chrome/browser/webshare/ShareServiceImplementationFactory.java",
++  "java/src/org/chromium/chrome/browser/workspaces/WorkspaceController.java",
+ ]
+ 
+ if (enable_screen_capture) {
+--- a/chrome/android/features/tab_ui/BUILD.gn
++++ b/chrome/android/features/tab_ui/BUILD.gn
+@@ -31,8 +31,10 @@ android_resources("java_resources") {
+     "java/res/color/tab_group_favicon_quater_empty_fill_color.xml",
+     "java/res/color/tab_highlight_card_bg_color.xml",
+     "java/res/color/tab_hover_card_bg_color.xml",
++    "java/res/color/tab_strip_workspace_button_bg_tint_list.xml",
+     "java/res/color/vertical_tabs_button_background_color.xml",
+     "java/res/drawable/archived_tab_icon.xml",
++    "java/res/drawable/bg_workspace_tab_strip_button.xml",
+     "java/res/drawable/chevron_right.xml",
+     "java/res/drawable/ic_check_googblue_20dp_animated.xml",
+     "java/res/drawable/ic_close_tabs_24dp.xml",
+@@ -43,6 +45,8 @@ android_resources("java_resources") {
+     "java/res/drawable/ic_rating_star_outline.xml",
+     "java/res/drawable/ic_select_all_24dp.xml",
+     "java/res/drawable/ic_ungroup_tabs_24dp.xml",
++    "java/res/drawable/ic_workspace_24dp.xml",
++    "java/res/drawable/ic_workspace_tab_strip_24dp.xml",
+     "java/res/drawable/iph_drag_and_drop_drawable.xml",
+     "java/res/drawable/phone_tab_switcher_empty_state_illustration.xml",
+     "java/res/drawable/phone_tab_switcher_empty_state_illustration_bottom_window.xml",
+@@ -95,6 +99,7 @@ android_resources("java_resources") {
+     "java/res/drawable/vertical_tabs_right_rounded_button_background.xml",
+     "java/res/drawable/vertical_tabs_scrollbar_thumb.xml",
+     "java/res/drawable/vertical_tabs_top_rounded_button_background.xml",
++    "java/res/drawable/workspace_more_icon.xml",
+     "java/res/drawable/xr_empty_state_backplate.xml",
+     "java/res/layout/archived_tabs_auto_delete_promo.xml",
+     "java/res/layout/archived_tabs_dialog.xml",
+@@ -142,6 +147,7 @@ android_resources("java_resources") {
+     "java/res/layout/vertical_tab_layout.xml",
+     "java/res/layout/vertical_tab_pinned_item.xml",
+     "java/res/layout/vertical_tab_pinned_item_hidden.xml",
++    "java/res/layout/vertical_workspace_header.xml",
+     "java/res/values-sw600dp/dimens.xml",
+     "java/res/values-sw600dp/values.xml",
+     "java/res/values/attrs.xml",
+--- /dev/null
++++ b/chrome/android/features/tab_ui/java/res/color/tab_strip_workspace_button_bg_tint_list.xml
+@@ -0,0 +1,15 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright 2026 The Chromium Authors
++     Use of this source code is governed by a BSD-style license that can be
++     found in the LICENSE file. -->
++
++<!-- The toolbar buttons' halo (default_icon_background): pressed, its 12% fill under the ripple's
++     highlight comes to about 20%; hovered, 8%. The strip only draws the halo while the button is
++     touched or hovered, so the default is the pressed colour it keeps for a moment after a tap. -->
++<selector xmlns:android="http://schemas.android.com/apk/res/android">
++    <item android:state_pressed="true"
++        android:color="@color/color_on_surface_with_alpha_20" />
++    <item android:state_hovered="true"
++        android:color="@color/color_on_surface_with_alpha_8" />
++    <item android:color="@color/color_on_surface_with_alpha_20" />
++</selector>
+--- /dev/null
++++ b/chrome/android/features/tab_ui/java/res/drawable/bg_workspace_tab_strip_button.xml
+@@ -0,0 +1,14 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright 2026 The Chromium Authors
++     Use of this source code is governed by a BSD-style license that can be
++     found in the LICENSE file. -->
++
++<!-- The workspace button's halo: the same 40dp circle a toolbar button shows when touched
++     (default_icon_background). White, so the button's background tint gives it its colour. -->
++<shape xmlns:android="http://schemas.android.com/apk/res/android"
++    android:shape="oval">
++    <size
++        android:width="@dimen/large_icon_background_size"
++        android:height="@dimen/large_icon_background_size" />
++    <solid android:color="@android:color/white" />
++</shape>
+--- /dev/null
++++ b/chrome/android/features/tab_ui/java/res/drawable/ic_workspace_24dp.xml
+@@ -0,0 +1,25 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright 2026 The Chromium Authors
++     Use of this source code is governed by a BSD-style license that can be
++     found in the LICENSE file. -->
++
++<!-- Vivaldi's workspace glyph (WorkspaceButton.svg): a diamond over two chevrons on a 28-unit
++     grid. The viewport is cropped to the artwork (14x15 units at 7,7) so it fills the icon the
++     way the Material icons around it do, rather than sitting small inside its original padding. -->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="20"
++    android:viewportHeight="20">
++    <group
++        android:translateX="-4"
++        android:translateY="-4.5">
++        <path
++            android:fillColor="#00000000"
++            android:pathData="M7,11.0519L14,7L21,11.0519L14,15Z M21,14.5L14,18.5L7,14.5 M21,18L14,22L7,18"
++            android:strokeColor="@macro/default_icon_color"
++            android:strokeLineCap="round"
++            android:strokeLineJoin="round"
++            android:strokeWidth="1.5" />
++    </group>
++</vector>
+--- /dev/null
++++ b/chrome/android/features/tab_ui/java/res/drawable/ic_workspace_tab_strip_24dp.xml
+@@ -0,0 +1,25 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright 2026 The Chromium Authors
++     Use of this source code is governed by a BSD-style license that can be
++     found in the LICENSE file. -->
++
++<!-- The workspace glyph for the tab strip's workspace button, drawn to the size and stroke weight
++     of the toolbar's Material icons (the home icon's artwork is about 17dp across). The compositor
++     rasterizes it without a theme, so the stroke is white and the button tints it. -->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="22"
++    android:viewportHeight="22">
++    <group
++        android:translateX="-3"
++        android:translateY="-3.5">
++        <path
++            android:fillColor="#00000000"
++            android:pathData="M7,11.0519L14,7L21,11.0519L14,15Z M21,14.5L14,18.5L7,14.5 M21,18L14,22L7,18"
++            android:strokeColor="@android:color/white"
++            android:strokeLineCap="round"
++            android:strokeLineJoin="round"
++            android:strokeWidth="1.8" />
++    </group>
++</vector>
+--- /dev/null
++++ b/chrome/android/features/tab_ui/java/res/drawable/workspace_more_icon.xml
+@@ -0,0 +1,15 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright 2026 The Chromium Authors
++     Use of this source code is governed by a BSD-style license that can be
++     found in the LICENSE file. -->
++
++<!-- The toolbar's three-dot glyph, as the workspace card's menu button. -->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:fillColor="@macro/default_icon_color"
++        android:pathData="M12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,10c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM12,16c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2z" />
++</vector>
+--- a/chrome/android/features/tab_ui/java/res/layout/vertical_tab_layout.xml
++++ b/chrome/android/features/tab_ui/java/res/layout/vertical_tab_layout.xml
+@@ -75,12 +75,20 @@ found in the LICENSE file.
+             android:visibility="gone" />
+     </LinearLayout>
+ 
++    <!-- Workspace card: the workspace the rail is showing, and its menu. -->
++    <FrameLayout
++        android:id="@+id/workspace_header_container"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        app:layout_constraintTop_toBottomOf="@id/vertical_tab_header_container"
++        android:visibility="gone" />
++
+     <!-- Pinned Tabs Recycler View -->
+     <org.chromium.chrome.browser.tasks.tab_management.TabListRecyclerView
+         android:id="@+id/pinned_tabs_recycler_view"
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content"
+-        app:layout_constraintTop_toBottomOf="@id/vertical_tab_header_container"
++        app:layout_constraintTop_toBottomOf="@id/workspace_header_container"
+         android:overScrollMode="never" />
+ 
+     <!-- Tab List Recycler View -->
+--- /dev/null
++++ b/chrome/android/features/tab_ui/java/res/layout/vertical_workspace_header.xml
+@@ -0,0 +1,52 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++Copyright 2026 The Chromium Authors
++Use of this source code is governed by a BSD-style license that can be
++found in the LICENSE file.
++-->
++
++<!-- The workspace card at the top of the vertical tab rail. It is sized and inset exactly like a
++     tab row, so the workspace icon sits on the favicon column, the name on the title column and
++     the menu button on the close button column. -->
++<LinearLayout
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:id="@+id/workspace_header"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:layout_marginBottom="@dimen/vertical_tab_item_margin_bottom"
++    android:background="@drawable/vertical_tabs_new_tab_button_background"
++    android:gravity="center_vertical"
++    android:orientation="horizontal"
++    android:paddingTop="@dimen/vertical_tab_item_padding_vertical"
++    android:paddingBottom="@dimen/vertical_tab_item_padding_vertical"
++    android:paddingEnd="@dimen/vertical_tab_item_padding_horizontal">
++
++    <ImageView
++        android:id="@+id/workspace_icon"
++        android:layout_width="@dimen/vertical_tab_item_icon_size"
++        android:layout_height="@dimen/vertical_tab_item_icon_size"
++        android:layout_marginStart="@dimen/vertical_tab_item_padding_horizontal"
++        android:importantForAccessibility="no"
++        android:src="@drawable/ic_workspace_24dp" />
++
++    <TextView
++        android:id="@+id/workspace_name"
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:layout_weight="1"
++        android:layout_marginStart="@dimen/vertical_tab_item_favicon_margin_end"
++        android:layout_marginEnd="@dimen/vertical_tab_item_title_margin_end"
++        android:ellipsize="end"
++        android:singleLine="true"
++        android:textAppearance="@style/TextAppearance.TextMedium.Primary" />
++
++    <org.chromium.ui.widget.ChromeImageView
++        android:id="@+id/workspace_menu_button"
++        android:layout_width="@dimen/vertical_tab_item_icon_size"
++        android:layout_height="@dimen/vertical_tab_item_icon_size"
++        android:background="?attr/selectableItemBackgroundBorderless"
++        android:contentDescription="@string/workspaces_title"
++        android:src="@drawable/workspace_more_icon"
++        app:tint="@macro/default_icon_color" />
++</LinearLayout>
+--- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/StaticPinnedTabsMediator.java
++++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/StaticPinnedTabsMediator.java
+@@ -9,8 +9,10 @@ import org.chromium.build.annotations.Nu
+ import org.chromium.chrome.browser.tab.Tab;
+ import org.chromium.chrome.browser.tabmodel.TabModel;
+ import org.chromium.chrome.browser.tabmodel.TabModelObserver;
++import org.chromium.chrome.browser.ui.vertical_tabs.Workspaces;
+ import org.chromium.ui.modelutil.ListObservable;
+ import org.chromium.ui.modelutil.MVCListAdapter.ListItem;
++import org.chromium.ui.modelutil.PropertyModel;
+ 
+ import java.util.HashMap;
+ import java.util.HashSet;
+@@ -22,6 +24,9 @@ import java.util.Set;
+  * Mediator for Static Pinned Tabs. Observes the main TabListModel and TabModel to mirror pinned
+  * tabs into a dedicated ModelList. It shares the exact same PropertyModel instances with the main
+  * list so that state updates (such as titles and favicons) propagate automatically.
++ *
++ * <p>Pinned tabs of workspaces other than the one on screen are left out, so the pinned list is not
++ * always the whole leading pinned run of the main list.
+  */
+ @NullMarked
+ public class StaticPinnedTabsMediator {
+@@ -31,6 +36,7 @@ public class StaticPinnedTabsMediator {
+     private final TabModelObserver mTabModelObserver;
+     private final ListObservable.ListObserver<Void> mMainListObserver;
+     private final Runnable mOnVisibilityChanged;
++    private final Runnable mWorkspacesObserver = this::updatePinnedTabsList;
+     private boolean mWasEmpty = true;
+ 
+     /**
+@@ -53,8 +59,6 @@ public class StaticPinnedTabsMediator {
+                 new ListObservable.ListObserver<>() {
+                     @Override
+                     public void onItemRangeInserted(ListObservable source, int index, int count) {
+-                        if (index > mPinnedModelList.size()) return;
+-
+                         for (int i = 0; i < count; i++) {
+                             ListItem item = mMainModelList.get(index + i);
+                             if (TabProperties.isPinnedTab(item.model)) {
+@@ -71,10 +75,6 @@ public class StaticPinnedTabsMediator {
+                             return;
+                         }
+ 
+-                        // Pinned tabs are contiguous at the start of the list. Any removal past
+-                        // that range cannot affect pinned tabs.
+-                        if (index >= mPinnedModelList.size()) return;
+-
+                         // Pre-compute the active tab IDs to perform constant time lookups in the
+                         // loop below.
+                         Set<Integer> mainTabIds = new HashSet<>();
+@@ -107,10 +107,18 @@ public class StaticPinnedTabsMediator {
+                     public void onItemMoved(ListObservable source, int curIndex, int newIndex) {
+                         ListItem item = mMainModelList.get(newIndex);
+                         if (!TabProperties.isPinnedTab(item.model)) return;
++                        int currentIndex = mPinnedModelList.indexOf(item);
++                        if (currentIndex == TabModel.INVALID_TAB_INDEX) return;
+ 
+-                        // If newIndex >= mPinnedModelList.size(), it's being unpinned and will be
+-                        // removed by didChangePinState shortly.
+-                        mPinnedModelList.moveItem(mPinnedModelList.indexOf(item), newIndex);
++                        // Its place among the pinned tabs shown. If it went past them, it is being
++                        // unpinned and will be removed by didChangePinState shortly.
++                        int targetIndex = 0;
++                        for (int i = 0; i < newIndex; i++) {
++                            if (isShownPinnedTab(mMainModelList.get(i).model)) targetIndex++;
++                        }
++                        if (targetIndex != currentIndex) {
++                            mPinnedModelList.moveItem(currentIndex, targetIndex);
++                        }
+                     }
+                 };
+ 
+@@ -152,12 +160,14 @@ public class StaticPinnedTabsMediator {
+         if (mTabModel != null) {
+             mTabModel.addObserver(mTabModelObserver);
+         }
++        Workspaces.addObserver(mWorkspacesObserver);
+ 
+         updatePinnedTabsList();
+     }
+ 
+     /** Destroys this mediator and removes observers. */
+     public void destroy() {
++        Workspaces.removeObserver(mWorkspacesObserver);
+         mMainModelList.removeObserver(mMainListObserver);
+         if (mTabModel != null) {
+             mTabModel.removeObserver(mTabModelObserver);
+@@ -181,14 +191,22 @@ public class StaticPinnedTabsMediator {
+         mPinnedModelList.clear();
+         for (int i = 0; i < mMainModelList.size(); i++) {
+             ListItem item = mMainModelList.get(i);
+-            if (TabProperties.isPinnedTab(item.model)) {
++            if (isShownPinnedTab(item.model)) {
+                 mPinnedModelList.add(item);
+             }
+         }
+         notifyVisibilityChangedIfNeeded();
+     }
+ 
++    /** Whether a pinned tab belongs in the list: incognito ones, or the workspace on screen's. */
++    private static boolean isShownPinnedTab(PropertyModel model) {
++        return TabProperties.isPinnedTab(model)
++                && (model.get(TabProperties.IS_INCOGNITO)
++                        || !Workspaces.isTabHidden(TabProperties.getTabId(model)));
++    }
++
+     private void addListItemToPinnedModelList(ListItem item) {
++        if (!isShownPinnedTab(item.model)) return;
+         if (mPinnedModelList.indexOf(item) != TabModel.INVALID_TAB_INDEX) return;
+ 
+         int insertionIndex = mPinnedModelList.size();
+--- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/TabVerticalViewBinder.java
++++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/TabVerticalViewBinder.java
+@@ -48,6 +48,7 @@ import org.chromium.chrome.browser.tasks
+ import org.chromium.chrome.browser.tasks.tab_management.vertical_tabs.VerticalTabHoverCardController.TabHoverCardListener;
+ import org.chromium.chrome.browser.tasks.tab_management.vertical_tabs.VerticalTabListProperties.RailCollapseState;
+ import org.chromium.chrome.browser.ui.vertical_tabs.VerticalTabUtils;
++import org.chromium.chrome.browser.ui.vertical_tabs.Workspaces;
+ import org.chromium.chrome.tab_ui.R;
+ import org.chromium.components.browser_ui.styles.ChromeColors;
+ import org.chromium.components.browser_ui.styles.SemanticColorUtils;
+@@ -129,6 +130,31 @@ class TabVerticalViewBinder {
+             updateParentPadding(model, view);
+             updateIcons(model, view);
+         }
++        updateWorkspaceVisibility(model, view);
++    }
++
++    /**
++     * Tabs of other workspaces keep their place in the list -- its indices mirror the tab model's,
++     * which the list mediator relies on -- but fold to nothing, so the rail shows only the tabs of
++     * the workspace on screen. A group's header goes with the group's first tab, whose id it
++     * carries. Incognito tabs belong to no workspace.
++     */
++    private static void updateWorkspaceVisibility(PropertyModel model, ViewGroup view) {
++        boolean hidden =
++                !model.get(TabProperties.IS_INCOGNITO)
++                        && Workspaces.isTabHidden(model.get(TabProperties.TAB_ID));
++        view.setVisibility(hidden ? View.GONE : View.VISIBLE);
++        if (!(view.getLayoutParams() instanceof ViewGroup.MarginLayoutParams params)) return;
++        int height = hidden ? 0 : ViewGroup.LayoutParams.WRAP_CONTENT;
++        int bottomMargin =
++                hidden
++                        ? 0
++                        : view.getResources()
++                                .getDimensionPixelSize(R.dimen.vertical_tab_item_margin_bottom);
++        if (params.height == height && params.bottomMargin == bottomMargin) return;
++        params.height = height;
++        params.bottomMargin = bottomMargin;
++        view.setLayoutParams(params);
+     }
+ 
+     /**
+@@ -195,6 +221,7 @@ class TabVerticalViewBinder {
+             updateTitle(R.id.group_title, model, view);
+             updateChildRowPadding(model, view);
+         }
++        updateWorkspaceVisibility(model, view);
+     }
+ 
+     // Common Property Binding Helpers
+--- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabListCoordinator.java
++++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabListCoordinator.java
+@@ -784,6 +784,11 @@ public class VerticalTabListCoordinator
+         mMediator.toggleTabGroupExpansion(tabId);
+     }
+ 
++    /** Whether the rail is showing incognito tabs in a window shared with the regular ones. */
++    public boolean isShowingIncognito() {
++        return mContainerModel.get(VerticalTabListProperties.IS_INCOGNITO);
++    }
++
+     private void onCurrentTabModelChanged(TabModel tabModel) {
+         if (mTabModelSelector.isTabStateInitialized()) {
+             resetWithListOfTabs(tabModel);
+--- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabListViewBinder.java
++++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabListViewBinder.java
+@@ -7,6 +7,7 @@ package org.chromium.chrome.browser.task
+ import android.content.Context;
+ import android.content.res.ColorStateList;
+ import android.view.View;
++import android.view.ViewGroup;
+ import android.widget.ImageView;
+ 
+ import androidx.core.view.ViewCompat;
+@@ -71,7 +72,13 @@ public class VerticalTabListViewBinder {
+         } else if (VerticalTabListProperties.COLLAPSE_STATE == propertyKey) {
+             view.setCollapseState(model.get(VerticalTabListProperties.COLLAPSE_STATE));
+         } else if (VerticalTabListProperties.IS_INCOGNITO == propertyKey) {
+-            updateIncognitoColors(view, model.get(VerticalTabListProperties.IS_INCOGNITO));
++            boolean isIncognito = model.get(VerticalTabListProperties.IS_INCOGNITO);
++            updateIncognitoColors(view, isIncognito);
++            // The workspace card, where there is one, is about the regular tabs.
++            ViewGroup workspaceCard = view.findViewById(R.id.workspace_header_container);
++            if (workspaceCard != null && workspaceCard.getChildCount() > 0) {
++                workspaceCard.setVisibility(isIncognito ? View.GONE : View.VISIBLE);
++            }
+         }
+     }
+ 
+--- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabsSideUiCoordinator.java
++++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabsSideUiCoordinator.java
+@@ -46,6 +46,7 @@ import org.chromium.chrome.browser.ui.si
+ import org.chromium.chrome.browser.ui.side_ui.SideUiCoordinator.UiUpdateRequest;
+ import org.chromium.chrome.browser.ui.side_ui.SideUiObserver;
+ import org.chromium.chrome.browser.ui.vertical_tabs.VerticalTabUtils;
++import org.chromium.chrome.browser.ui.vertical_tabs.Workspaces;
+ import org.chromium.components.browser_ui.styles.SemanticColorUtils;
+ import org.chromium.chrome.tab_ui.R;
+ import org.chromium.base.Callback;
+@@ -89,6 +90,11 @@ public class VerticalTabsSideUiCoordinat
+     // hidden by other conditions such as narrow window i.e. |mIsAutoHiddenSupplier.get()| is true.
+     private boolean mManualVisible;
+ 
++    private @Nullable WorkspaceRailHeader mWorkspaceHeader;
++    // Switching workspace changes which rows the rail shows: rows re-bind to hide or reveal
++    // themselves, and the card follows.
++    private final Runnable mWorkspacesObserver = this::refreshRowsAfterResize;
++
+     // The rail's width and close buttons are changed from settings while the rail stays open.
+     private final SharedPreferences.OnSharedPreferenceChangeListener mRailSettingsListener =
+             (prefs, key) -> {
+@@ -153,6 +159,20 @@ public class VerticalTabsSideUiCoordinat
+         mCollapseController.setRailCollapseListener(this::onRailCollapseStateChangeRequestedByUser);
+         ContextUtils.getAppSharedPreferences()
+                 .registerOnSharedPreferenceChangeListener(mRailSettingsListener);
++        Workspaces.addObserver(mWorkspacesObserver);
++    }
++
++    /**
++     * Shows the workspace card at the head of the rail. A tap on it asks {@code onMenuRequested}
++     * for the workspace menu, anchored to the card.
++     */
++    public void setWorkspaceMenuHandler(Callback<View> onMenuRequested) {
++        if (mWorkspaceHeader != null) return;
++        ViewGroup container = mRootView.findViewById(R.id.workspace_header_container);
++        if (container == null) return;
++        mWorkspaceHeader = new WorkspaceRailHeader(container, onMenuRequested);
++        // Not over incognito tabs; the rail list shows and hides it as the tab model changes.
++        container.setVisibility(mTabListCoordinator.isShowingIncognito() ? View.GONE : View.VISIBLE);
+     }
+ 
+     /**
+@@ -205,6 +225,7 @@ public class VerticalTabsSideUiCoordinat
+      * look it had when the drag started.
+      */
+     private void refreshRowsAfterResize() {
++        if (mWorkspaceHeader != null) mWorkspaceHeader.update();
+         View list = mRootView.findViewById(R.id.tab_list_recycler_view);
+         if (!(list instanceof RecyclerView recyclerView)) return;
+         RecyclerView.Adapter<?> adapter = recyclerView.getAdapter();
+@@ -389,6 +410,8 @@ public class VerticalTabsSideUiCoordinat
+     public void destroy() {
+         ContextUtils.getAppSharedPreferences()
+                 .unregisterOnSharedPreferenceChangeListener(mRailSettingsListener);
++        Workspaces.removeObserver(mWorkspacesObserver);
++        if (mWorkspaceHeader != null) mWorkspaceHeader.destroy();
+         updateAutoHiddenState(false);
+         mSideUiCoordinator.removeObserver(this);
+         mCollapseController.setRailCollapseListener(null);
+--- /dev/null
++++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/WorkspaceRailHeader.java
+@@ -0,0 +1,74 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++package org.chromium.chrome.browser.tasks.tab_management.vertical_tabs;
++
++import android.content.Context;
++import android.content.res.ColorStateList;
++import android.view.LayoutInflater;
++import android.view.View;
++import android.view.ViewGroup;
++import android.widget.ImageView;
++import android.widget.TextView;
++
++import androidx.core.widget.ImageViewCompat;
++
++import org.chromium.base.Callback;
++import org.chromium.build.annotations.NullMarked;
++import org.chromium.chrome.browser.ui.vertical_tabs.VerticalTabUtils;
++import org.chromium.chrome.browser.ui.vertical_tabs.Workspaces;
++import org.chromium.chrome.browser.ui.vertical_tabs.Workspaces.Workspace;
++import org.chromium.chrome.browser.workspaces.WorkspaceController;
++import org.chromium.chrome.tab_ui.R;
++
++/**
++ * The workspace card at the top of the vertical tab rail: the workspace on screen, in its colour,
++ * and the way into the workspace menu. The rail below it shows only that workspace's tabs.
++ */
++@NullMarked
++class WorkspaceRailHeader {
++    private final View mView;
++    private final ImageView mIcon;
++    private final TextView mName;
++    private final View mMenuButton;
++    private final Runnable mWorkspacesObserver = this::update;
++
++    /**
++     * @param container Where the card goes, at the head of the rail.
++     * @param onMenuRequested Opens the workspace menu, anchored to the view it is given.
++     */
++    WorkspaceRailHeader(ViewGroup container, Callback<View> onMenuRequested) {
++        mView =
++                LayoutInflater.from(container.getContext())
++                        .inflate(R.layout.vertical_workspace_header, container, false);
++        mIcon = mView.findViewById(R.id.workspace_icon);
++        mName = mView.findViewById(R.id.workspace_name);
++        mMenuButton = mView.findViewById(R.id.workspace_menu_button);
++        mView.setOnClickListener(v -> onMenuRequested.onResult(mView));
++        mMenuButton.setOnClickListener(v -> onMenuRequested.onResult(mView));
++        container.addView(mView);
++        Workspaces.addObserver(mWorkspacesObserver);
++        update();
++    }
++
++    /** Re-reads the current workspace, and the rail's width for whether there is room for text. */
++    void update() {
++        Context context = mView.getContext();
++        Workspace workspace = Workspaces.getActive();
++        mName.setText(workspace.name);
++        Integer color = WorkspaceController.getSpaceColor(context, workspace.color);
++        ImageViewCompat.setImageTintList(
++                mIcon, color == null ? null : ColorStateList.valueOf(color));
++        // An icon-only rail has room for the workspace glyph and nothing else, like its tab rows.
++        boolean iconOnly = VerticalTabUtils.isIconOnlyRail();
++        mName.setVisibility(iconOnly ? View.GONE : View.VISIBLE);
++        mMenuButton.setVisibility(iconOnly ? View.GONE : View.VISIBLE);
++        mView.setContentDescription(
++                context.getString(R.string.workspaces_title) + ", " + workspace.name);
++    }
++
++    void destroy() {
++        Workspaces.removeObserver(mWorkspacesObserver);
++    }
++}
+--- a/chrome/android/features/tab_ui/java/strings/android_chrome_tab_ui_strings.grd
++++ b/chrome/android/features/tab_ui/java/strings/android_chrome_tab_ui_strings.grd
+@@ -1175,6 +1175,65 @@
+         Send feedback about the tab strip
+       </message>
+ 
++      <!-- Workspaces -->
++      <message name="IDS_WORKSPACES_TITLE" desc="Name of the feature that keeps sets of tabs apart, shown on its switcher button and in settings.">
++        Spaces
++      </message>
++      <message name="IDS_WORKSPACES_SUMMARY" desc="Summary of the setting that turns workspaces on.">
++        Keep sets of tabs apart, each with its own cookies if you like
++      </message>
++      <message name="IDS_WORKSPACE_NEW" desc="Workspace menu item that creates a new workspace.">
++        New space
++      </message>
++      <message name="IDS_WORKSPACE_EDIT" desc="Space menu item that opens the settings dialog of the current space: its name, color and storage.">
++        Space settings…
++      </message>
++      <message name="IDS_WORKSPACE_SEPARATE_STORAGE" desc="Checkbox in the space settings dialog that gives the space storage of its own: its own cookies, logins and site data.">
++        Isolate space
++      </message>
++      <message name="IDS_WORKSPACE_MOVE_TABS" desc="Tab menu item that opens a submenu of the workspaces the tabs can be moved to.">
++        {TABS_COUNT, plural,
++          =1 {Move tab to space}
++          other {Move tabs to space}
++        }
++      </message>
++      <message name="IDS_WORKSPACE_DELETE" desc="Workspace menu item that deletes the current workspace.">
++        Delete space
++      </message>
++      <message name="IDS_WORKSPACE_DELETE_TITLE" desc="Title of the dialog confirming a workspace should be deleted.">
++        Delete the “<ph name="WORKSPACE_NAME">%1$s<ex>Work</ex></ph>” space?
++      </message>
++      <message name="IDS_WORKSPACE_DELETE_MESSAGE_ONE" desc="Body of the dialog confirming a workspace should be deleted, when it holds one tab.">
++        Deleting the space will close the 1 tab inside it.
++      </message>
++      <message name="IDS_WORKSPACE_DELETE_MESSAGE_MANY" desc="Body of the dialog confirming a workspace should be deleted, when it holds several tabs.">
++        Deleting the space will close the <ph name="TAB_COUNT">%1$d<ex>4</ex></ph> tabs inside it.
++      </message>
++      <message name="IDS_WORKSPACE_DELETE_CONFIRM" desc="Button that deletes a workspace, in the dialog confirming it.">
++        Delete
++      </message>
++      <message name="IDS_WORKSPACE_SETTINGS_TITLE" desc="Title of the dialog for renaming a workspace, choosing its color and whether it has its own storage.">
++        Space settings
++      </message>
++      <message name="IDS_WORKSPACE_NAME_HINT" desc="Hint in the text field holding a workspace's name.">
++        Name
++      </message>
++      <message name="IDS_WORKSPACE_COLOR" desc="Heading above the colors a workspace can be given.">
++        Space color
++      </message>
++      <message name="IDS_WORKSPACE_NO_COLOR" desc="Accessibility label of the choice that leaves a workspace without a color.">
++        No color
++      </message>
++      <message name="IDS_WORKSPACE_DONE" desc="Button that saves a workspace's name and color.">
++        Done
++      </message>
++      <message name="IDS_WORKSPACE_CURRENT" desc="Accessibility label of the checked entry in the space menu: the name and tab count of the space on screen.">
++        <ph name="SPACE_ENTRY">%1$s<ex>Work (4)</ex></ph>, current space
++      </message>
++      <message name="IDS_WORKSPACE_TAB_COUNT" desc="Menu entry for a workspace: its name followed by how many tabs it holds.">
++        <ph name="WORKSPACE_NAME">%1$s<ex>Work</ex></ph> (<ph name="TAB_COUNT">%2$d<ex>4</ex></ph>)
++      </message>
++
+       <!-- Tab Group List Bottom Sheet -->
+       <message name="IDS_TAB_GROUP_LIST_BOTTOM_SHEET_TITLE" desc="Title text for a bottom sheet which is used to add a tab to a tab group.">
+         Add to
+--- a/chrome/android/features/tab_ui/tab_management_java_sources.gni
++++ b/chrome/android/features/tab_ui/tab_management_java_sources.gni
+@@ -254,4 +254,5 @@ internal_tab_management_java_sources = [
+   "//chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabRailLayout.java",
+   "//chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabsActionDelegate.java",
+   "//chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/VerticalTabsSideUiCoordinator.java",
++  "//chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/vertical_tabs/WorkspaceRailHeader.java",
+ ]
+--- a/chrome/android/java/res/xml/experimental_tabs_preferences.xml
++++ b/chrome/android/java/res/xml/experimental_tabs_preferences.xml
+@@ -59,4 +59,9 @@ found in the LICENSE file.
+         android:key="tab_stacking_pref"
+         android:persistent="false"
+         android:title="@string/tab_stacking_title"/>
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:dependency="enable_tabs_switch"
++        android:key="workspaces_switch"
++        android:summary="@string/workspaces_summary"
++        android:title="@string/workspaces_title"/>
+ </PreferenceScreen>
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelper.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/StripLayoutHelper.java
+@@ -131,6 +131,9 @@ import org.chromium.chrome.browser.tasks
+ import org.chromium.chrome.browser.tasks.tab_management.TabUiUtils;
+ import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
+ import org.chromium.chrome.browser.ui.vertical_tabs.VerticalTabUtils;
++import org.chromium.chrome.browser.ui.vertical_tabs.Workspaces;
++import org.chromium.chrome.browser.workspaces.WorkspaceController;
++import org.chromium.chrome.browser.workspaces.WorkspaceController;
+ import org.chromium.chrome.browser.user_education.UserEducationHelper;
+ import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+ import org.chromium.components.browser_ui.styles.ChromeColors;
+@@ -202,6 +205,11 @@ public class StripLayoutHelper
+     // Visibility Constants
+     private static final float BUTTON_BACKGROUND_Y_OFFSET_DP = 3.f;
+ 
++    // The workspace button is laid out like a toolbar button: a toolbar-sized icon over the
++    // toolbar's 40dp halo (large_icon_background_size), which stays up a moment after a tap.
++    private static final float WORKSPACE_BUTTON_HALO_SIZE_DP = 40.f;
++    private static final long WORKSPACE_BUTTON_HALO_LINGER_MS = 200;
++
+     // Desired spacing between new tab button and tabs when tab strip is not full.
+     private static final float DESIRED_PADDING_BETWEEN_NEW_TAB_BUTTON_AND_TABS = 2.f;
+     static final float FADE_FULL_OPACITY_THRESHOLD_DP = 24.f;
+@@ -641,6 +649,12 @@ public class StripLayoutHelper
+     private float mReservedStartMargin;
+ 
+     private final boolean mIncognito;
++    // Workspaces take over the leading tab search slot: an icon at the head of the strip that
++    // opens the workspace menu. Regular tabs only; incognito has no workspaces.
++    private final boolean mShowsWorkspaceButton;
++    private final Runnable mWorkspacesObserver;
++    private final Runnable mHideWorkspaceButtonHalo = this::hideWorkspaceButtonHalo;
++    private boolean mWorkspaceButtonHaloShown;
+     private boolean mSelected;
+     private boolean mIsFirstLayoutPass;
+     // Whether tab strip scrolling is in progress
+@@ -823,12 +837,14 @@ public class StripLayoutHelper
+         mScrollDelegate = new ScrollDelegate(context);
+ 
+         Resources res = context.getResources();
++        mShowsWorkspaceButton = !incognito && Workspaces.isEnabled();
+         // Set tab search button background resource.
+         mTabSearchButtonWidth =
+-                ChromeFeatureList.sTabSearchForDesktop.isEnabled()
++                ChromeFeatureList.sTabSearchForDesktop.isEnabled() || mShowsWorkspaceButton
+                         ? BUTTON_TOUCH_TARGET_SIZE_DP
+                         : 0.f;
+         mTabSearchButton = createTabSearchButton(context, incognito, res);
++        updateWorkspaceButtonTint(context);
+ 
+         // Use toolbar menu button padding to align NTB with menu button.
+         float buttonEndPadding =
+@@ -844,6 +860,18 @@ public class StripLayoutHelper
+         mLeadingButtonDelegate = leadingButtonDelegate;
+         mManagerHost = managerHost;
+         mUpdateHost = updateHost;
++        // Switching workspace, or moving a tab between them, changes which tabs the strip shows --
++        // and which groups keep a title -- and the workspace button wears the colour of the
++        // workspace on screen.
++        mWorkspacesObserver =
++                () -> {
++                    updateWorkspaceButtonTint(context);
++                    if (mModel != null && mModel.getTabGroupCount() > 0) {
++                        mStripTabEventHandler.post(this::rebuildStripViewsForWorkspace);
++                    }
++                    updateHost.requestUpdate();
++                };
++        Workspaces.addObserver(mWorkspacesObserver);
+         mRenderHost = renderHost;
+ 
+         // Set new tab button background resource.
+@@ -921,6 +949,7 @@ public class StripLayoutHelper
+     /** Cleans up internal state. An instance should not be used after this method is called. */
+     @SuppressWarnings("NullAway")
+     public void destroy() {
++        Workspaces.removeObserver(mWorkspacesObserver);
+         mStripTabEventHandler.removeCallbacksAndMessages(null);
+         mLastHoveredTab = null;
+         if (mTabHoverCardView != null) {
+@@ -968,51 +997,119 @@ public class StripLayoutHelper
+ 
+     private TintedCompositorButton createTabSearchButton(
+             Context context, boolean incognito, Resources res) {
++        float size =
++                mShowsWorkspaceButton ? WORKSPACE_BUTTON_HALO_SIZE_DP : BUTTON_BACKGROUND_SIZE_DP;
+         TintedCompositorButton button =
+                 new TintedCompositorButton(
+                         context,
+                         incognito,
+                         ButtonType.TAB_SEARCH,
+                         /* parentView= */ null,
+-                        BUTTON_BACKGROUND_SIZE_DP,
+-                        BUTTON_BACKGROUND_SIZE_DP,
++                        size,
++                        size,
+                         mControlContainer::setTooltipText,
+                         /* clickHandler= */ this,
+                         /* keyboardFocusHandler= */ this,
+-                        R.drawable.ic_manage_search_16dp,
+-                        R.drawable.bg_square_rounded_tab_strip_button,
++                        mShowsWorkspaceButton
++                                ? R.drawable.ic_workspace_tab_strip_24dp
++                                : R.drawable.ic_manage_search_16dp,
++                        mShowsWorkspaceButton
++                                ? R.drawable.bg_workspace_tab_strip_button
++                                : R.drawable.bg_square_rounded_tab_strip_button,
+                         BUTTON_CLICK_SLOP_DP);
+ 
+         // Set an off-color background for the tab search button to distinguish it in the strip.
+         // Note that if this is not set, it will match the color of the background around it.
+-        button.setBackgroundAlwaysVisible(true);
++        // The workspace button shows its halo only while touched or hovered, as a toolbar button
++        // does.
++        button.setBackgroundAlwaysVisible(!mShowsWorkspaceButton);
+         @ColorRes
+         int bgTintRes =
+-                incognito
+-                        ? R.color.tab_strip_tsb_bg_incognito_tint_list
+-                        : R.color.tab_strip_tsb_bg_tint_list;
++                mShowsWorkspaceButton
++                        ? R.color.tab_strip_workspace_button_bg_tint_list
++                        : incognito
++                                ? R.color.tab_strip_tsb_bg_incognito_tint_list
++                                : R.color.tab_strip_tsb_bg_tint_list;
+         button.setBackgroundTint(context.getColorStateList(bgTintRes));
+ 
+         button.setTint(ChromeColors.getPrimaryIconTint(context, incognito).getDefaultColor());
+-        button.setDrawY(BUTTON_BACKGROUND_Y_OFFSET_DP);
++        // The workspace button is centred in the strip's row once its height is known (see
++        // updateTabSearchButton).
++        button.setDrawY(mShowsWorkspaceButton ? 0.f : BUTTON_BACKGROUND_Y_OFFSET_DP);
++        if (mShowsWorkspaceButton) {
++            Float side = getTabSearchButtonSideInset();
++            button.setTouchTargetInsets(side, null, side, null);
++        }
+         button.setAccessibilityDescription(
+-                res.getString(R.string.accessibility_search_loupe_tooltip_text));
+-        button.setVisible(ChromeFeatureList.sTabSearchForDesktop.isEnabled());
++                res.getString(
++                        mShowsWorkspaceButton
++                                ? R.string.workspaces_title
++                                : R.string.accessibility_search_loupe_tooltip_text));
++        button.setVisible(
++                ChromeFeatureList.sTabSearchForDesktop.isEnabled() || mShowsWorkspaceButton);
+         return button;
+     }
+ 
++    /** Tints the workspace button in the colour of the workspace on screen, if it has one. */
++    private void updateWorkspaceButtonTint(Context context) {
++        if (!mShowsWorkspaceButton) return;
++        Integer color = WorkspaceController.getSpaceColor(context, Workspaces.getActive().color);
++        mTabSearchButton.setTint(
++                color != null
++                        ? color
++                        : ChromeColors.getPrimaryIconTint(context, /* isIncognito= */ false)
++                                .getDefaultColor());
++    }
++
+     private void updateTabSearchButton() {
+         mTabSearchButton.setVisible(mTabSearchButtonWidth > 0.f);
+         if (mTabSearchButton.isVisible()) {
++            float inset = getWorkspaceButtonSlotInset();
+             if (LocalizationUtils.isLayoutRtl()) {
+-                mTabSearchButton.setDrawX(mWidth - mRightPadding - mTabSearchButtonWidth);
++                mTabSearchButton.setDrawX(mWidth - mRightPadding - mTabSearchButtonWidth + inset);
+             } else {
+-                mTabSearchButton.setDrawX(mLeftPadding);
++                mTabSearchButton.setDrawX(mLeftPadding + inset);
++            }
++            // The halo is as tall as the strip's row, so only centred in it is it not cut off.
++            if (mShowsWorkspaceButton) {
++                mTabSearchButton.setDrawY(
++                        Math.max(0.f, (mHeight - WORKSPACE_BUTTON_HALO_SIZE_DP) / 2));
+             }
+         }
+     }
+ 
+     /**
++     * How far the workspace button's halo sits inside its slot at the start of the strip: centred,
++     * the way a toolbar button's icon sits in its 48dp. The home button's icon lines up with it.
++     */
++    private float getWorkspaceButtonSlotInset() {
++        return mShowsWorkspaceButton
++                ? (mTabSearchButtonWidth - WORKSPACE_BUTTON_HALO_SIZE_DP) / 2
++                : 0.f;
++    }
++
++    /**
++     * The side insets that make the workspace button's touch target its whole slot and no more,
++     * so it takes no touches from the first tab; null keeps the click slop of other buttons.
++     */
++    private @Nullable Float getTabSearchButtonSideInset() {
++        return mShowsWorkspaceButton ? BUTTON_CLICK_SLOP_DP - getWorkspaceButtonSlotInset() : null;
++    }
++
++    /** Puts up the workspace button's halo while it is touched, as a toolbar button's ripple. */
++    private void showWorkspaceButtonHalo() {
++        mStripTabEventHandler.removeCallbacks(mHideWorkspaceButtonHalo);
++        mWorkspaceButtonHaloShown = true;
++        mTabSearchButton.setBackgroundAlwaysVisible(true);
++    }
++
++    private void hideWorkspaceButtonHalo() {
++        mWorkspaceButtonHaloShown = false;
++        mTabSearchButton.setBackgroundAlwaysVisible(false);
++        mRenderHost.requestRender();
++    }
++
++    /**
+      * Get a list of virtual views for accessibility.
+      *
+      * @param views A List to populate with virtual views.
+@@ -1277,8 +1374,14 @@ public class StripLayoutHelper
+     }
+ 
+     private void updateMargins(boolean recalculateTabWidth) {
+-        // Reserve space for tab search button if it is visible at the start of the strip.
+-        mReservedStartMargin = mTabSearchButton.isVisible() ? mTabSearchButtonWidth : 0.f;
++        // Reserve space for tab search button if it is visible at the start of the strip. Beside
++        // the workspace button, the first tab's card starts where the toolbar's address bar does,
++        // past the home button below it; a tab's card sits a folio foot inside its bounds.
++        mReservedStartMargin =
++                mTabSearchButton.isVisible()
++                        ? mTabSearchButtonWidth
++                                - (mShowsWorkspaceButton ? FOLIO_FOOT_LENGTH_DP : 0.f)
++                        : 0.f;
+         if (LocalizationUtils.isLayoutRtl()) {
+             mLeftMargin = mReservedEndMargin + mLeftPadding;
+             mRightMargin = mReservedStartMargin + mRightPadding;
+@@ -1359,7 +1462,8 @@ public class StripLayoutHelper
+ 
+         if (topPaddingChanged) {
+             mNewTabButton.setTouchTargetInsets(null, mTopPadding, null, -mTopPadding);
+-            mTabSearchButton.setTouchTargetInsets(null, mTopPadding, null, -mTopPadding);
++            Float side = getTabSearchButtonSideInset();
++            mTabSearchButton.setTouchTargetInsets(side, mTopPadding, side, -mTopPadding);
+         }
+ 
+         updateTabSearchButton();
+@@ -2349,15 +2453,10 @@ public class StripLayoutHelper
+                             || (StripLayoutOptions.floatingTabsEnabled()
+                                     && !currTab.getIsSelected());
+ 
+-            // 2. Set start divider visibility. A folded stack member takes no space in the main
+-            // row, so the visual neighbour is the nearest view before it that is not folded.
++            // 2. Set start divider visibility. The visual neighbour is the nearest view before it
++            // that is not folded away.
+             int prevIndex = i - 1;
+-            while (prevIndex >= 0
+-                    && viewsOnStrip[prevIndex] instanceof StripLayoutTab candidate
+-                    && candidate.isCollapsed()
+-                    && TabStacks.getStackForTab(candidate.getTabId()) != TabStacks.NO_STACK) {
+-                prevIndex--;
+-            }
++            while (prevIndex >= 0 && isFoldedAway(viewsOnStrip[prevIndex])) prevIndex--;
+             if (prevIndex >= 0 && viewsOnStrip[prevIndex] instanceof StripLayoutTab prevTab) {
+                 boolean prevContainerHidden =
+                         StripLayoutTabDelegate.isTabHidden(prevTab)
+@@ -2377,9 +2476,13 @@ public class StripLayoutHelper
+             if (currTab.shouldForceHideEndDivider()) {
+                 currTab.setEndDividerVisible(/* visible= */ false);
+             } else {
+-                boolean isLastTab = i == (viewsOnStrip.length - 1);
++                int nextIndex = i + 1;
++                while (nextIndex < viewsOnStrip.length && isFoldedAway(viewsOnStrip[nextIndex])) {
++                    nextIndex++;
++                }
++                boolean isLastTab = nextIndex == viewsOnStrip.length;
+                 boolean endDividerVisible =
+-                        (isLastTab || viewsOnStrip[i + 1] instanceof StripLayoutGroupTitle)
++                        (isLastTab || viewsOnStrip[nextIndex] instanceof StripLayoutGroupTitle)
+                                 && currContainerHidden
+                                 && !currTab.isDying();
+                 currTab.setEndDividerVisible(endDividerVisible);
+@@ -2387,6 +2490,17 @@ public class StripLayoutHelper
+         }
+     }
+ 
++    /**
++     * Whether {@code view} takes no space in the main row: a folded stack member, or a tab of
++     * another workspace. A collapsed group's tabs do not count; their title stands in for them.
++     */
++    private boolean isFoldedAway(StripLayoutView view) {
++        return view instanceof StripLayoutTab tab
++                && tab.isCollapsed()
++                && (TabStacks.getStackForTab(tab.getTabId()) != TabStacks.NO_STACK
++                        || (!mIncognito && Workspaces.isTabHidden(tab.getTabId())));
++    }
++
+     private void updateTouchableRect() {
+         // Make the entire strip touchable when during dragging / reordering mode.
+         boolean isTabDraggingInProgress = isViewDraggingInProgress();
+@@ -2546,6 +2660,7 @@ public class StripLayoutHelper
+         // Second-row tabs act on click; there is nothing to press or drag there.
+         if (isInSubstripBand(y)) return;
+         if (mNewTabButton.onDown(x, y, buttons) || mTabSearchButton.onDown(x, y, buttons)) {
++            if (mShowsWorkspaceButton && mTabSearchButton.isPressed()) showWorkspaceButtonHalo();
+             mRenderHost.requestRender();
+             return;
+         }
+@@ -3331,6 +3446,11 @@ public class StripLayoutHelper
+         if (mTabSearchButton.onUpOrCancel()) {
+             handleTabSearchClick();
+         }
++        // The halo stays up a moment after the finger lifts, as a toolbar button's ripple does.
++        if (mWorkspaceButtonHaloShown) {
++            mStripTabEventHandler.postDelayed(
++                    mHideWorkspaceButtonHalo, WORKSPACE_BUTTON_HALO_LINGER_MS);
++        }
+         mIsStripScrollInProgress = false;
+         resetDelayedReorderState();
+     }
+@@ -3366,9 +3486,22 @@ public class StripLayoutHelper
+     }
+ 
+     private void handleTabSearchClick() {
++        if (mShowsWorkspaceButton) {
++            showWorkspaceMenu();
++            return;
++        }
+         mLeadingButtonDelegate.onTabSearchClicked();
+     }
+ 
++    private void showWorkspaceMenu() {
++        WorkspaceController controller = WorkspaceController.from(mWindowAndroid);
++        if (controller == null) return;
++        RectProvider anchorRectProvider = new RectProvider();
++        mTabSearchButton.getAnchorRect(anchorRectProvider.getRect());
++        getAdjustedAnchorRect(anchorRectProvider, /* includeTopPadding= */ false);
++        controller.showMenu(anchorRectProvider);
++    }
++
+     @Override
+     public void onKeyboardFocus(boolean isFocused, StripLayoutView view) {
+         if (!isFocused) return;
+@@ -4545,6 +4678,9 @@ public class StripLayoutHelper
+                 mGroupIdToHideSupplier.set(null);
+             }
+         }
++        // Groups of other workspaces go without a title, as their tabs fold away (see
++        // syncStacksWithStrip).
++        numGroups -= countGroupsHiddenByWorkspace();
+ 
+         int groupTitleIndex = 0;
+         StripLayoutGroupTitle[] groupTitles = new StripLayoutGroupTitle[numGroups];
+@@ -4563,7 +4699,8 @@ public class StripLayoutHelper
+             assert tabGroupId != null;
+             StripLayoutGroupTitle groupTitle = findOrCreateGroupTitle(tabGroupId);
+             seenGroupIds.add(tabGroupId);
+-            if (!tabGroupId.equals(mGroupIdToHideSupplier.get())) {
++            if (!tabGroupId.equals(mGroupIdToHideSupplier.get())
++                    && !isGroupHiddenByWorkspace(tabGroupId)) {
+                 if (TabUiUtils.shouldShowIphForSync(mTabGroupSyncService, tabGroupId)) {
+                     mLastSyncedGroupIdForIph = tabGroupId;
+                 }
+@@ -4592,7 +4729,8 @@ public class StripLayoutHelper
+                 }
+                 seenGroupIds.add(nextTabGroupId);
+                 StripLayoutGroupTitle groupTitle = findOrCreateGroupTitle(nextTabGroupId);
+-                if (!nextTabGroupId.equals(mGroupIdToHideSupplier.get())) {
++                if (!nextTabGroupId.equals(mGroupIdToHideSupplier.get())
++                        && !isGroupHiddenByWorkspace(nextTabGroupId)) {
+                     if (TabUiUtils.shouldShowIphForSync(mTabGroupSyncService, nextTabGroupId)) {
+                         mLastSyncedGroupIdForIph = nextTabGroupId;
+                     }
+@@ -5055,9 +5193,11 @@ public class StripLayoutHelper
+     }
+ 
+     private void computeIdealViewPositions() {
+-        float startX = getStartPositionForStripViews();
+-        boolean scrollOffsetAdded = false;
+         boolean rtl = LocalizationUtils.isLayoutRtl();
++        float startX =
++                getStartPositionForStripViews()
++                        - MathUtils.flipSignIf(getLeadingGroupTitleAlignment(), rtl);
++        boolean scrollOffsetAdded = false;
+         for (int i = 0; i < mStripViews.length; i++) {
+             final StripLayoutView view = mStripViews[i];
+ 
+@@ -5093,6 +5233,29 @@ public class StripLayoutHelper
+     }
+ 
+     /**
++     * Beside the workspace button the start margin lines a first tab's card up with the toolbar's
++     * address bar (see updateMargins). A group's title chip sits further inside its bounds, so when
++     * the strip opens with a group, this is how much further out it starts for its chip to line up
++     * too.
++     */
++    private float getLeadingGroupTitleAlignment() {
++        if (!mShowsWorkspaceButton) return 0.f;
++        for (StripLayoutView view : mStripViews) {
++            // Tabs folded away take no space.
++            if (view instanceof StripLayoutTab tab && tab.isCollapsed()) continue;
++            if (!(view instanceof StripLayoutGroupTitle groupTitle)) return 0.f;
++            float chipStartInset =
++                    LocalizationUtils.isLayoutRtl()
++                            ? groupTitle.getWidth()
++                                    - groupTitle.getPaddedWidth()
++                                    - (groupTitle.getPaddedX() - groupTitle.getDrawX())
++                            : groupTitle.getPaddedX() - groupTitle.getDrawX();
++            return mGroupTitleDrawXOffset + chipStartInset - FOLIO_FOOT_LENGTH_DP;
++        }
++        return 0.f;
++    }
++
++    /**
+      * Sets the idealX for the given {@link StripLayoutTab}. For LTR, this is the same as the
+      * startX. For RTL, however, draw coordinates are still always anchored at the top-left of the
+      * screen. This means we need to set the idealX to the left-side of the tab. This is the startX
+@@ -5326,15 +5489,30 @@ public class StripLayoutHelper
+         List<Boolean> toHidden = new ArrayList<>();
+         for (StripLayoutTab stripTab : mStripTabs) {
+             Tab tab = getTabById(stripTab.getTabId());
+-            // Tabs under a real group title keep their group's collapse semantics; stacks never
+-            // touch them. Checked against the visible title rather than the raw group id, so a
+-            // solo tab that merely carries a group token is still stackable.
+-            if (tab == null || findGroupTitle(tab.getTabGroupId()) != null) continue;
++            if (tab == null) continue;
+             int tabId = stripTab.getTabId();
+-            boolean hidden = TabStacks.isHiddenByStack(tabId, activeId);
++            // Tabs of other workspaces fold away exactly as a stack's hidden members do.
++            boolean workspaceHidden = !mIncognito && Workspaces.isTabHidden(tabId);
++            // Tabs under a real group title keep their group's collapse semantics and stacks never
++            // touch them, though one of another workspace still folds away inside its group.
++            // Checked against the visible title rather than the raw group id, so a solo tab that
++            // merely carries a group token is still stackable -- as are the tabs of a group of
++            // another workspace, which has no title, so they fold away with it.
++            StripLayoutGroupTitle groupTitle = findGroupTitle(tab.getTabGroupId());
++            if (groupTitle != null) {
++                if (stripTab.isCollapsed() != workspaceHidden
++                        && (workspaceHidden || !groupTitle.isCollapsed())) {
++                    toChange.add(stripTab);
++                    toHidden.add(workspaceHidden);
++                }
++                continue;
++            }
++            boolean stackHidden = TabStacks.isHiddenByStack(tabId, activeId);
++            boolean hidden = stackHidden || workspaceHidden;
+             // The active stack's other members drop into the second row.
+             boolean inSubstrip =
+-                    hidden
++                    stackHidden
++                            && !workspaceHidden
+                             && activeStackId != TabStacks.NO_STACK
+                             && TabStacks.getStackForTab(tabId) == activeStackId;
+             float offsetY = inSubstrip ? mHeight : 0f;
+@@ -5344,13 +5522,15 @@ public class StripLayoutHelper
+             toHidden.add(hidden);
+         }
+         if (toChange.isEmpty()) return;
+-        if (animate) finishAnimations();
++        // Land whatever is still animating first. A resize started a moment ago -- a tab was
++        // just added -- would otherwise end after this and give a tab collapsed here its width
++        // back.
++        finishAnimationsAndCloseDyingTabs();
+         List<Animator> animators = animate ? new ArrayList<>() : null;
+         for (int i = 0; i < toChange.size(); i++) {
+             Animator animator = updateTabCollapsed(toChange.get(i), toHidden.get(i), animate);
+             if (animators != null && animator != null) animators.add(animator);
+         }
+-        finishAnimationsAndCloseDyingTabs();
+         List<Animator> resizeAnimators =
+                 computeAndUpdateTabWidth(/* animate= */ animate, /* deferAnimations= */ animate);
+         if (animators != null) {
+@@ -5361,6 +5541,46 @@ public class StripLayoutHelper
+     }
+ 
+     /**
++     * Rebuilds the strip's views after a workspace change, to give or take the titles of groups.
++     * Posted, as the change can come while the strip is still catching up with the tab model -- a
++     * closed tab's neighbour being selected, say -- and skipped while tabs are closing, which ends
++     * in a rebuild of its own.
++     */
++    private void rebuildStripViewsForWorkspace() {
++        if (mModel == null || mCloseAnimationsRequested) return;
++        for (StripLayoutTab stripTab : mStripTabs) {
++            if (stripTab.isDying() || getTabById(stripTab.getTabId()) == null) return;
++        }
++        rebuildStripViews();
++    }
++
++    /**
++     * Whether a tab group belongs to a workspace other than the one on screen. A group goes with
++     * its first tab, as it does in the vertical rail.
++     */
++    private boolean isGroupHiddenByWorkspace(Token tabGroupId) {
++        if (mIncognito || mModel == null) return false;
++        List<Tab> tabs = mModel.getTabsInGroup(tabGroupId);
++        return !tabs.isEmpty() && Workspaces.isTabHidden(tabs.get(0).getId());
++    }
++
++    /** The groups among the strip's tabs that go without a title for belonging elsewhere. */
++    private int countGroupsHiddenByWorkspace() {
++        if (mIncognito || mModel == null) return 0;
++        Token groupIdToHide = mGroupIdToHideSupplier.get();
++        Set<Token> hiddenGroupIds = new HashSet<>();
++        for (StripLayoutTab stripTab : mStripTabs) {
++            Tab tab = getTabById(stripTab.getTabId());
++            if (tab == null || !mModel.isTabInTabGroup(tab)) continue;
++            Token tabGroupId = assumeNonNull(tab.getTabGroupId());
++            // The group being deleted has lost its title already.
++            if (tabGroupId.equals(groupIdToHide)) continue;
++            if (isGroupHiddenByWorkspace(tabGroupId)) hiddenGroupIds.add(tabGroupId);
++        }
++        return hiddenGroupIds.size();
++    }
++
++    /**
+      * Rebuilds the cached title of any tab whose stack label changed -- it became a stack's face,
+      * stopped being one, or its stack changed size.
+      */
+--- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabContextMenuCoordinator.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabContextMenuCoordinator.java
+@@ -71,6 +71,8 @@ import org.chromium.chrome.browser.ui.me
+ import org.chromium.chrome.browser.ui.signin.SigninAndHistorySyncActivityLauncher;
+ import org.chromium.chrome.browser.ui.vertical_tabs.VerticalTabUtils;
+ import org.chromium.chrome.browser.ui.vertical_tabs.VerticalTabUtils.LayoutSwitchEntryPoint;
++import org.chromium.chrome.browser.ui.vertical_tabs.Workspaces;
++import org.chromium.chrome.browser.workspaces.WorkspaceController;
+ import org.chromium.chrome.browser.url_constants.UrlConstantResolver;
+ import org.chromium.chrome.browser.url_constants.UrlConstantResolverFactory;
+ import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+@@ -508,7 +510,7 @@ public class TabContextMenuCoordinator e
+             @TabClosingSource int tabClosingSource) {
+         List<Tab> otherTabs = new ArrayList<>();
+         for (Tab tab : tabModel) {
+-            if (!tabIds.contains(tab.getId())) {
++            if (!tabIds.contains(tab.getId()) && !isInOtherWorkspace(tabModel, tab)) {
+                 otherTabs.add(tab);
+             }
+         }
+@@ -536,7 +538,7 @@ public class TabContextMenuCoordinator e
+                 // New pivot is to the right of the old pivot. Clear previously accumulated
+                 // tabs.
+                 otherTabs.clear();
+-            } else if (foundPivot) {
++            } else if (foundPivot && !isInOtherWorkspace(tabModel, tab)) {
+                 otherTabs.add(tab);
+             }
+         }
+@@ -689,8 +691,31 @@ public class TabContextMenuCoordinator e
+     private boolean canCloseTabsToTheRight(AnchorInfo anchorInfo) {
+         List<Integer> tabIds = anchorInfo.getAllTabIds();
+         TabModel tabModel = getTabModel();
+-        Tab lastTab = tabModel.getTabAt(tabModel.getCount() - 1);
+-        return lastTab != null && !tabIds.contains(lastTab.getId());
++        // The last tab on screen decides; those of other workspaces are out of reach.
++        for (int i = tabModel.getCount() - 1; i >= 0; i--) {
++            Tab tab = tabModel.getTabAt(i);
++            if (tab == null || isInOtherWorkspace(tabModel, tab)) continue;
++            return !tabIds.contains(tab.getId());
++        }
++        return false;
++    }
++
++    /**
++     * Whether {@code tab} belongs to a workspace other than the one on screen. Such tabs are out
++     * of sight, so the menu's bulk closing actions leave them alone.
++     */
++    private static boolean isInOtherWorkspace(TabModel tabModel, Tab tab) {
++        return !tabModel.isIncognitoBranded() && Workspaces.isTabHidden(tab.getId());
++    }
++
++    /** The number of tabs on screen: those of the workspace shown, or all of them. */
++    private int getTabCountOnScreen() {
++        TabModel tabModel = getTabModel();
++        int count = 0;
++        for (Tab tab : tabModel) {
++            if (!isInOtherWorkspace(tabModel, tab)) count++;
++        }
++        return count;
+     }
+ 
+     private void buildMenuActionItemsForSingleTab(
+@@ -705,6 +730,7 @@ public class TabContextMenuCoordinator e
+         if (shouldShowMoveToWindowItem(tabs, anchorInfo)) {
+             itemList.add(createMoveToWindowItem(anchorInfo, isIncognito));
+         }
++        addMoveToWorkspaceItem(itemList, tabs);
+         List<ListItem> reorderItems = createReorderItems(anchorInfo, isIncognito);
+         // Need to check list is non-empty before calling addAll; otherwise we get assertion error.
+         if (!reorderItems.isEmpty()) itemList.addAll(reorderItems);
+@@ -737,7 +763,7 @@ public class TabContextMenuCoordinator e
+             itemList.add(createCloseAllTabsItem(isIncognito));
+         }
+         if (ChromeFeatureList.sAndroidContextMenuNewActions.isEnabled()) {
+-            if (getTabModel().getCount() > 1) {
++            if (getTabCountOnScreen() > 1) {
+                 itemList.add(createCloseOtherTabsItem(isIncognito));
+             }
+             if (canCloseTabsToTheRight(anchorInfo)) {
+@@ -768,6 +794,7 @@ public class TabContextMenuCoordinator e
+         if (shouldShowMoveToWindowItem(tabs, anchorInfo)) {
+             itemList.add(createMoveToWindowItem(anchorInfo, isIncognito));
+         }
++        addMoveToWorkspaceItem(itemList, tabs);
+         itemList.add(buildMenuDivider(isIncognito));
+         itemList.add(createPinUnpinTabItem(tabs, isIncognito));
+         itemList.add(createMuteUnmuteSiteItem(tabs, isIncognito));
+@@ -895,6 +922,14 @@ public class TabContextMenuCoordinator e
+                 allowMoveToNewWindow);
+     }
+ 
++    /** "Move to workspace", with the workspaces the tabs can go to in a submenu. */
++    private void addMoveToWorkspaceItem(ModelList itemList, List<Tab> tabs) {
++        WorkspaceController controller = WorkspaceController.from(mWindowAndroid);
++        if (controller == null) return;
++        ListItem item = controller.createMoveToWorkspaceItem(tabs);
++        if (item != null) itemList.add(item);
++    }
++
+     private ListItem createShareItem(boolean isIncognito) {
+         return buildListItem(R.string.share, R.id.share_tab, isIncognito);
+     }
+--- a/chrome/android/java/src/org/chromium/chrome/browser/settings/ExperimentalTabsSettings.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/ExperimentalTabsSettings.java
+@@ -41,6 +41,7 @@ public class ExperimentalTabsSettings ex
+     static final String PREF_VERTICAL_TABS = "vertical_tabs_switch";
+     static final String PREF_VERTICAL_TABS_WIDTH = "vertical_tabs_width_pref";
+     static final String PREF_VERTICAL_TABS_SHOW_CLOSE = "vertical_tabs_show_close_switch";
++    static final String PREF_WORKSPACES = "workspaces_switch";
+ 
+     private final SettableMonotonicObservableSupplier<String> mPageTitle =
+             ObservableSuppliers.createMonotonic();
+@@ -73,6 +74,9 @@ public class ExperimentalTabsSettings ex
+                 true,
+                 true);
+         bindVerticalTabsWidth();
++        // The strip's workspace button and the window's workspace handling are set up with the
++        // activity, so the change takes a relaunch.
++        bind(PREF_WORKSPACES, ChromePreferenceKeys.WORKSPACES_ENABLED, true, true);
+     }
+ 
+     private void bindVerticalTabsWidth() {
+--- a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabArchiverImpl.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/tab/TabArchiverImpl.java
+@@ -33,10 +33,10 @@ import org.chromium.chrome.browser.tabmo
+ import org.chromium.chrome.browser.tabmodel.TabModelSelector;
+ import org.chromium.chrome.browser.tabmodel.TabModelUtils;
+ import org.chromium.chrome.browser.tasks.tab_management.TabShareUtils;
++import org.chromium.chrome.browser.ui.vertical_tabs.Workspaces;
+ import org.chromium.components.tab_group_sync.LocalTabGroupId;
+ import org.chromium.components.tab_group_sync.SavedTabGroup;
+ import org.chromium.components.tab_group_sync.TabGroupSyncService;
+-import org.chromium.url.GURL;
+ 
+ import java.util.ArrayList;
+ import java.util.HashMap;
+@@ -162,7 +162,7 @@ public class TabArchiverImpl implements
+ 
+         Tab activeTab = regularTabModel.getTabByIdChecked(activeTabId);
+         // Maps unique URLs to their MRU timestamp, used to declutter duplicate tabs.
+-        Map<GURL, Long> tabUrlToLastActiveTimestampMap =
++        Map<String, Long> tabUrlToLastActiveTimestampMap =
+                 createUrlToMruTimestampMap(regularTabModel);
+         // Maps unique tab group tokens to the eligibility of that group.
+         Map<Token, Boolean> tabGroupIdToArchiveEligibilityMap = new HashMap<>();
+@@ -518,7 +518,7 @@ public class TabArchiverImpl implements
+     private boolean isGroupTabEligibleForArchive(
+             TabModel regularTabModel,
+             Map<Token, Boolean> groupIdToArchiveEligibilityMap,
+-            Map<GURL, Long> tabUrlToLastActiveTimestampMap,
++            Map<String, Long> tabUrlToLastActiveTimestampMap,
+             Tab tab) {
+         // Create a map between group id tokens and their archive eligibility. If a group has
+         // not been checked yet, check all related tabs and assign a status so that tabs with
+@@ -536,7 +536,7 @@ public class TabArchiverImpl implements
+     }
+ 
+     private boolean isTabGroupEligibleForArchive(
+-            TabModel regularTabModel, Map<GURL, Long> tabUrlToLastActiveTimestampMap, Tab tab) {
++            TabModel regularTabModel, Map<String, Long> tabUrlToLastActiveTimestampMap, Tab tab) {
+         // Do not archived shared tab groups, defined by a null collaboration ID.
+         if (TabShareUtils.getCollaborationIdOrNull(
+                         tab.getId(), regularTabModel, mTabGroupSyncService)
+@@ -554,7 +554,7 @@ public class TabArchiverImpl implements
+     }
+ 
+     private boolean isTabEligibleForArchive(
+-            Map<GURL, Long> tabUrlToLastActiveTimestampMap, Tab tab) {
++            Map<String, Long> tabUrlToLastActiveTimestampMap, Tab tab) {
+         TabState tabState = TabStateExtractor.from(tab);
+         if (tabState == null || tabState.contentsState == null) return false;
+ 
+@@ -592,44 +592,52 @@ public class TabArchiverImpl implements
+ 
+     // A tab is marked as a duplicate tab if its last active timestamp is not the same as the stored
+     // last active timestamp in the model wide hashmap.
+-    private boolean isDuplicateTab(Map<GURL, Long> tabUrlToLastActiveTimestampMap, Tab tab) {
+-        GURL url = tab.getUrl();
++    private boolean isDuplicateTab(Map<String, Long> tabUrlToLastActiveTimestampMap, Tab tab) {
++        String key = getDuplicateKey(tab);
+ 
+         // If the tab URL does not exist in the map or the tab is part of a group, no op.
+-        if (!tabUrlToLastActiveTimestampMap.containsKey(url) || tab.getTabGroupId() != null) {
++        if (!tabUrlToLastActiveTimestampMap.containsKey(key) || tab.getTabGroupId() != null) {
+             return false;
+         }
+ 
+         long tabLastActiveTimestamp = tab.getTimestampMillis();
+-        long currentUrlLastActiveTimestamp = tabUrlToLastActiveTimestampMap.get(url);
++        long currentUrlLastActiveTimestamp = tabUrlToLastActiveTimestampMap.get(key);
+ 
+         return currentUrlLastActiveTimestamp > tabLastActiveTimestamp;
+     }
+ 
+     // Check all tabs in the tab model and record unique URLs and the latest last active timestamp.
+-    private Map<GURL, Long> createUrlToMruTimestampMap(TabModel model) {
+-        Map<GURL, Long> urlToTimestampMap = new HashMap<>();
++    private Map<String, Long> createUrlToMruTimestampMap(TabModel model) {
++        Map<String, Long> urlToTimestampMap = new HashMap<>();
+         if (!mTabArchiveSettings.isArchiveDuplicateTabsEnabled()) {
+             return urlToTimestampMap;
+         }
+         for (Tab tab : model) {
+-            GURL url = tab.getUrl();
++            String key = getDuplicateKey(tab);
+             long tabLastActiveTimestamp = tab.getTimestampMillis();
+ 
+             // Only record tabs that are not part of a tab group to avoid deduplicating them.
+             if (tab.getTabGroupId() == null) {
+-                if (urlToTimestampMap.containsKey(url)) {
+-                    long currentUrlLastActiveTimestamp = urlToTimestampMap.get(url);
++                if (urlToTimestampMap.containsKey(key)) {
++                    long currentUrlLastActiveTimestamp = urlToTimestampMap.get(key);
+                     if (tabLastActiveTimestamp <= currentUrlLastActiveTimestamp) {
+                         continue;
+                     }
+                 }
+-                urlToTimestampMap.put(url, tabLastActiveTimestamp);
++                urlToTimestampMap.put(key, tabLastActiveTimestamp);
+             }
+         }
+         return urlToTimestampMap;
+     }
+ 
++    /**
++     * A tab duplicates another only within one workspace: the same page open in two workspaces is
++     * two separate sessions, often in two separate storage partitions, not one tab twice.
++     */
++    private static String getDuplicateKey(Tab tab) {
++        return Workspaces.getWorkspaceOfTab(tab.getId()) + " " + tab.getUrl().getSpec();
++    }
++
+     private boolean isTimestampWithinTargetHours(long timestampMillis, int targetHours) {
+         if (timestampMillis == INVALID_TIMESTAMP) return false;
+ 
+--- a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabImpl.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/tab/TabImpl.java
+@@ -85,6 +85,7 @@ import org.chromium.chrome.browser.tabwi
+ import org.chromium.chrome.browser.ui.native_page.FrozenNativePage;
+ import org.chromium.chrome.browser.ui.native_page.NativePage;
+ import org.chromium.chrome.browser.ui.native_page.NativePage.SmoothTransitionDelegate;
++import org.chromium.chrome.browser.ui.vertical_tabs.Workspaces;
+ import org.chromium.chrome.browser.url_constants.UrlConstantResolver;
+ import org.chromium.chrome.browser.url_constants.UrlConstantResolverFactory;
+ import org.chromium.components.autofill.AutofillManagerWrapper;
+@@ -1016,8 +1017,7 @@ class TabImpl implements Tab, TabInterna
+ 
+         if (mPendingLoadParams != null) {
+             if (mWebContents == null) {
+-                WebContents webContents =
+-                        WebContentsFactory.createWebContents(mProfile, isHidden(), false);
++                WebContents webContents = createWebContentsForWorkspace(isHidden(), false);
+                 initWebContents(webContents);
+             }
+             loadUrl(mPendingLoadParams);
+@@ -1528,6 +1528,13 @@ class TabImpl implements Tab, TabInterna
+             restoreFieldsFromState(tabState);
+         }
+ 
++        // A new tab joins its parent's workspace, or the current one; a restored tab keeps its
++        // own. This has to be settled before any WebContents exists, since the workspace decides
++        // which storage partition that WebContents is created in.
++        if (takesPartInWorkspaces()) {
++            Workspaces.onTabCreated(getId(), mParentId, /* isRestore= */ tabState != null);
++        }
++
+         initializeNative();
+ 
+         RevenueStats.getInstance().tabCreated(this);
+@@ -1551,13 +1558,9 @@ class TabImpl implements Tab, TabInterna
+             } else if (getPendingLoadParams() != null) {
+                 assert webContents == null;
+ 
+-                webContents =
+-                        WebContentsFactory.createWebContents(
+-                                mProfile, isHidden(), initializeRenderer);
++                webContents = createWebContentsForWorkspace(isHidden(), initializeRenderer);
+             } else if (createWebContents) {
+-                webContents =
+-                        WebContentsFactory.createWebContents(
+-                                mProfile, initiallyHidden, initializeRenderer);
++                webContents = createWebContentsForWorkspace(initiallyHidden, initializeRenderer);
+             }
+             assert webContents != null;
+         } else if (mWebContentsState == null
+@@ -1567,9 +1570,7 @@ class TabImpl implements Tab, TabInterna
+             // WebContents. Restoring will be done when showing the tab in the foreground. It is
+             // also correct to not create a WebContents if one was provided to this method.
+ 
+-            webContents =
+-                    WebContentsFactory.createWebContents(
+-                            mProfile, initiallyHidden, initializeRenderer);
++            webContents = createWebContentsForWorkspace(initiallyHidden, initializeRenderer);
+         }
+ 
+         // Initialization logic that requires a WebContents to have been created.
+@@ -2543,6 +2544,62 @@ class TabImpl implements Tab, TabInterna
+         }
+     }
+ 
++    /** Whether this tab belongs to a workspace: regular tabs of the tabbed browser only. */
++    private boolean takesPartInWorkspaces() {
++        return !isIncognito() && !isCustomTab();
++    }
++
++    /** The storage partition this tab's page lives in, or null for the profile's own storage. */
++    private @Nullable String getWorkspacePartition() {
++        return takesPartInWorkspaces() ? Workspaces.getPartitionForTab(getId()) : null;
++    }
++
++    /** Creates this tab's WebContents in the storage partition of the workspace it belongs to. */
++    private WebContents createWebContentsForWorkspace(
++            boolean initiallyHidden, boolean initializeRenderer) {
++        return WebContentsFactory.createWebContents(
++                mProfile, initiallyHidden, initializeRenderer, getWorkspacePartition());
++    }
++
++    /**
++     * Moves this tab's page into the storage partition of its workspace, after the workspace's
++     * storage setting changed. A page's partition is fixed when its WebContents is created, so
++     * this rebuilds the WebContents from its session history, which is kept, and reloads the page:
++     * at once if the tab is on screen, otherwise when it is next shown. A frozen tab has nothing to
++     * move; it is rebuilt in the right partition when it is restored.
++     */
++    void moveToWorkspaceStorage() {
++        if (mWebContents == null || isDestroyed() || isClosing() || !takesPartInWorkspaces()) {
++            return;
++        }
++        String partition = getWorkspacePartition();
++        if (TextUtils.equals(partition, WebContentsFactory.getWorkspacePartition(mWebContents))) {
++            return;
++        }
++        WebContentsState state =
++                WebContentsState.getWebContentsStateFromWebContents(mWebContents);
++        if (state == null) return;
++        boolean hidden = isHidden();
++        WebContents replacement =
++                state.restoreWebContents(getProfile(), hidden, /* noRenderer= */ hidden, partition);
++        state.destroy();
++        if (replacement == null) return;
++
++        ChromeActivity activity = getActivity();
++        View compositorView =
++                activity == null ? null : activity.getCompositorViewHolderSupplier().get();
++        if (compositorView != null) {
++            replacement.setSize(compositorView.getWidth(), compositorView.getHeight());
++        }
++        // Swap the contents in, as a restored tab takes its first ones, and only then let the
++        // previous ones go: whatever watched them is told of the swap while they still exist.
++        WebContents previous = mWebContents;
++        destroyWebContents(/* deleteNativeWebContents= */ false);
++        initWebContents(replacement);
++        previous.destroy();
++        if (!hidden) replacement.getNavigationController().loadIfNecessary();
++    }
++
+     /**
+      * Restores the WebContents from its saved state. This should only be called if the tab is
+      * frozen with a saved TabState, and NOT if it was frozen for a lazy load.
+@@ -2557,7 +2614,8 @@ class TabImpl implements Tab, TabInterna
+             assert mWebContentsState != null;
+ 
+             WebContents webContents =
+-                    mWebContentsState.restoreWebContents(getProfile(), isHidden(), noRenderer);
++                    mWebContentsState.restoreWebContents(
++                            getProfile(), isHidden(), noRenderer, getWorkspacePartition());
+ 
+             UrlConstantResolver urlConstantResolver =
+                     UrlConstantResolverFactory.getForProfile(mProfile);
+@@ -2565,7 +2623,7 @@ class TabImpl implements Tab, TabInterna
+             if (webContents == null) {
+                 // State restore failed, just create a new empty web contents as that is the best
+                 // that can be done at this point.
+-                webContents = WebContentsFactory.createWebContents(mProfile, isHidden(), false);
++                webContents = createWebContentsForWorkspace(isHidden(), false);
+                 for (TabObserver observer : mObservers) observer.onRestoreFailed(this);
+                 restored = false;
+ 
+--- a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabUtils.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/tab/TabUtils.java
+@@ -301,6 +301,14 @@ public class TabUtils {
+     }
+ 
+     /**
++     * Moves a tab's page into the storage partition of its workspace, after the workspace's
++     * storage setting changed. See {@link TabImpl#moveToWorkspaceStorage}.
++     */
++    public static void moveToWorkspaceStorage(Tab tab) {
++        if (tab instanceof TabImpl tabImpl) tabImpl.moveToWorkspaceStorage();
++    }
++
++    /**
+      * Returns the {@link DrawableRes} ID for a given media state.
+      *
+      * @param mediaState The {@link MediaState} for which to get the indicator.
+--- a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java
+@@ -270,9 +270,11 @@ import org.chromium.chrome.browser.ui.si
+ import org.chromium.chrome.browser.ui.signin.FullscreenSigninPromoLauncher;
+ import org.chromium.chrome.browser.ui.system.StatusBarColorController.StatusBarColorProvider;
+ import org.chromium.chrome.browser.ui.vertical_tabs.VerticalTabUtils;
++import org.chromium.chrome.browser.ui.vertical_tabs.Workspaces;
+ import org.chromium.chrome.browser.user_education.UserEducationUtils.OptionalPromoType;
+ import org.chromium.chrome.browser.user_education.UserEducationUtils;
+ import org.chromium.chrome.browser.webapps.PwaRestorePromoUtils;
++import org.chromium.chrome.browser.workspaces.WorkspaceController;
+ import org.chromium.components.browser_ui.accessibility.PageZoomUtils;
+ import org.chromium.components.browser_ui.bottomsheet.EmptyBottomSheetObserver;
+ import org.chromium.components.browser_ui.widget.BrowserUiListMenuUtils;
+@@ -422,6 +424,7 @@ public class TabbedRootUiCoordinator ext
+     private @Nullable GlicUiCoordinator mGlicUiCoordinator;
+     private @Nullable ForcedSigninController mForcedSigninController;
+     private @Nullable VerticalTabsSideUiCoordinator mVerticalTabsSideUiCoordinator;
++    private @Nullable WorkspaceController mWorkspaceController;
+     private @Nullable TouchEventObserver mVerticalTabsResizeTouchObserver;
+     private @Nullable TabSearchOverlayCoordinator mTabSearchOverlayCoordinator;
+     private final VerticalTabsActionDelegate mVerticalTabsActionDelegate;
+@@ -2374,6 +2377,17 @@ public class TabbedRootUiCoordinator ext
+             mSidePanelContainerCoordinator.init(sidePanelCoordinatorAndroid);
+         }
+ 
++        // Workspaces: the strip's workspace button and the rail's workspace card both open this
++        // controller's menu; it also keeps the selection inside the workspace on screen.
++        if (Workspaces.isEnabled() && mWorkspaceController == null) {
++            TabModelSelector selector = mTabModelSelectorSupplier.get();
++            ModalDialogManager dialogManager = mModalDialogManagerSupplier.get();
++            if (selector != null && dialogManager != null) {
++                mWorkspaceController =
++                        new WorkspaceController(mActivity, mWindowAndroid, selector, dialogManager);
++            }
++        }
++
+         if (VerticalTabUtils.isVerticalTabsEligible(mActivity)) {
+             mVerticalTabsSideUiCoordinator =
+                     new VerticalTabsSideUiCoordinator(
+@@ -2427,6 +2441,11 @@ public class TabbedRootUiCoordinator ext
+                 mToolbarManager.setVerticalTabsAutoHiddenSupplier(
+                         mVerticalTabsSideUiCoordinator.getIsAutoHiddenSupplier());
+             }
++            WorkspaceController workspaceController = mWorkspaceController;
++            if (workspaceController != null) {
++                mVerticalTabsSideUiCoordinator.setWorkspaceMenuHandler(
++                        anchor -> workspaceController.showMenu(new ViewRectProvider(anchor)));
++            }
+         }
+ 
+         mSideUiStateProviderSupplier.onAvailable(
+@@ -2729,6 +2748,11 @@ public class TabbedRootUiCoordinator ext
+         // TODO(crbug.com/489548570): Remove SidePanelDevFeature when it's not needed.
+         mSidePanelDevFeature = null;
+ 
++        if (mWorkspaceController != null) {
++            mWorkspaceController.destroy();
++            mWorkspaceController = null;
++        }
++
+         if (mSidePanelContainerCoordinator != null) {
+             mSidePanelContainerCoordinator.destroy();
+             mSidePanelContainerCoordinator = null;
+--- /dev/null
++++ b/chrome/android/java/src/org/chromium/chrome/browser/workspaces/WorkspaceController.java
+@@ -0,0 +1,757 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++package org.chromium.chrome.browser.workspaces;
++
++import static org.chromium.ui.listmenu.ListMenuItemProperties.CLICK_LISTENER;
++import static org.chromium.ui.listmenu.ListMenuUtils.createAdapter;
++
++import android.app.Activity;
++import android.content.Context;
++import android.graphics.drawable.Drawable;
++import android.graphics.drawable.GradientDrawable;
++import android.text.InputType;
++import android.view.Gravity;
++import android.view.LayoutInflater;
++import android.view.View;
++import android.view.ViewGroup;
++import android.widget.EditText;
++import android.widget.LinearLayout;
++import android.widget.TextView;
++
++import androidx.annotation.ColorInt;
++import androidx.recyclerview.widget.GridLayoutManager;
++import androidx.recyclerview.widget.RecyclerView;
++
++import org.chromium.base.Callback;
++import org.chromium.base.MathUtils;
++import org.chromium.base.Token;
++import org.chromium.base.UnownedUserDataKey;
++import org.chromium.build.annotations.NullMarked;
++import org.chromium.build.annotations.Nullable;
++import org.chromium.chrome.browser.app.tabmodel.ArchivedTabModelOrchestrator;
++import org.chromium.chrome.browser.content.WebContentsFactory;
++import org.chromium.chrome.browser.multiwindow.MultiInstanceManager.PersistedInstanceType;
++import org.chromium.chrome.browser.multiwindow.MultiWindowUtils;
++import org.chromium.chrome.browser.ntp_customization.theme.chrome_colors.NtpChromeColorsAdapter;
++import org.chromium.chrome.browser.ntp_customization.theme.chrome_colors.NtpThemeColorInfo;
++import org.chromium.chrome.browser.ntp_customization.theme.chrome_colors.NtpThemeColorInfo.NtpThemeColorId;
++import org.chromium.chrome.browser.ntp_customization.theme.chrome_colors.NtpThemeColorUtils;
++import org.chromium.chrome.browser.profiles.Profile;
++import org.chromium.chrome.browser.tab.Tab;
++import org.chromium.chrome.browser.tab.TabLaunchType;
++import org.chromium.chrome.browser.tab.TabSelectionType;
++import org.chromium.chrome.browser.tab.TabUtils;
++import org.chromium.chrome.browser.tabmodel.TabClosureParams;
++import org.chromium.chrome.browser.tabmodel.TabCreatorUtil;
++import org.chromium.chrome.browser.tabmodel.TabModel;
++import org.chromium.chrome.browser.tabmodel.TabModelObserver;
++import org.chromium.chrome.browser.tabmodel.TabModelSelector;
++import org.chromium.chrome.browser.tabmodel.TabModelUtils;
++import org.chromium.chrome.browser.tasks.tab_management.TabOverflowMenuCoordinator;
++import org.chromium.chrome.browser.ui.vertical_tabs.Workspaces;
++import org.chromium.chrome.browser.ui.vertical_tabs.Workspaces.Workspace;
++import org.chromium.chrome.tab_ui.R;
++import org.chromium.components.browser_ui.widget.CheckBoxWithDescription;
++import org.chromium.components.browser_ui.widget.ListItemBuilder;
++import org.chromium.components.browser_ui.widget.list_view.TouchTrackingListView;
++import org.chromium.ui.UiUtils;
++import org.chromium.ui.base.ViewUtils;
++import org.chromium.ui.base.WindowAndroid;
++import org.chromium.ui.listmenu.BasicListMenu;
++import org.chromium.ui.listmenu.ListMenuItemAdapter;
++import org.chromium.ui.listmenu.ListMenuUtils;
++import org.chromium.ui.modaldialog.DialogDismissalCause;
++import org.chromium.ui.modaldialog.ModalDialogManager;
++import org.chromium.ui.modaldialog.ModalDialogManager.ModalDialogType;
++import org.chromium.ui.modaldialog.ModalDialogProperties;
++import org.chromium.ui.modelutil.MVCListAdapter.ListItem;
++import org.chromium.ui.modelutil.MVCListAdapter.ModelList;
++import org.chromium.ui.modelutil.PropertyModel;
++import org.chromium.ui.widget.AnchoredPopupWindow;
++import org.chromium.ui.widget.AnchoredPopupWindow.HorizontalOrientation;
++import org.chromium.ui.widget.RectProvider;
++
++import java.util.ArrayList;
++import java.util.HashSet;
++import java.util.List;
++import java.util.Set;
++
++/**
++ * Drives workspaces for one tabbed window: keeps the selection inside the current workspace,
++ * switches between workspaces, and shows the workspace menu and its dialogs. The strip's workspace
++ * button and the vertical rail's workspace card both open the same menu through {@link #from}.
++ */
++@NullMarked
++public class WorkspaceController {
++    private static final UnownedUserDataKey<WorkspaceController> KEY = new UnownedUserDataKey<>();
++
++    private static final int CHECK_SIZE_DP = 24;
++    // The new tab page's colour items are 48dp circles in 64dp rings, 4dp apart.
++    private static final int COLOR_ITEM_SIZE_DP = 52;
++    private static final int COLOR_CIRCLE_SIZE_DP = 40;
++    private static final int COLOR_ITEM_MARGIN_DP = 4;
++    private static final int DIALOG_PADDING_DP = 24;
++
++    private final Activity mActivity;
++    private final TabModelSelector mTabModelSelector;
++    private final ModalDialogManager mModalDialogManager;
++    private final TabModelObserver mTabModelObserver;
++    private final ArchivedTabModelOrchestrator.Observer mArchiveObserver =
++            archivedTabModel -> forgetLostTabs();
++    private @Nullable ArchivedTabModelOrchestrator mArchive;
++    private @Nullable AnchoredPopupWindow mMenuWindow;
++    // Set while this controller moves the selection itself, so the observer does not follow it.
++    private boolean mSelecting;
++    private boolean mDestroyed;
++
++    /** The controller serving {@code windowAndroid}'s tabbed window, if workspaces are on. */
++    public static @Nullable WorkspaceController from(WindowAndroid windowAndroid) {
++        return KEY.retrieveDataFromHost(windowAndroid.getUnownedUserDataHost());
++    }
++
++    public WorkspaceController(
++            Activity activity,
++            WindowAndroid windowAndroid,
++            TabModelSelector tabModelSelector,
++            ModalDialogManager modalDialogManager) {
++        mActivity = activity;
++        mTabModelSelector = tabModelSelector;
++        mModalDialogManager = modalDialogManager;
++        KEY.attachToHost(windowAndroid.getUnownedUserDataHost(), this);
++
++        mTabModelObserver =
++                new TabModelObserver() {
++                    @Override
++                    public void didSelectTab(Tab tab, @TabSelectionType int type, int lastId) {
++                        onTabSelected(tab, type, lastId);
++                    }
++
++                    @Override
++                    public void didAddTab(
++                            Tab tab, int type, int creationState, boolean markedForSelection) {
++                        // A tab moved in from elsewhere -- a custom tab opened in the browser,
++                        // or a tab from another window -- joins the workspace on screen. Tabs
++                        // restored at startup are left alone: one never assigned belongs to the
++                        // default workspace, not whichever workspace happens to be current.
++                        if (type == TabLaunchType.FROM_REPARENTING
++                                && !Workspaces.isTabAssigned(tab.getId())) {
++                            Workspaces.setWorkspaceOfTab(tab.getId(), Workspaces.getActiveId());
++                        }
++                    }
++
++                    @Override
++                    public void restoreCompleted() {
++                        syncActiveWithSelectedTab();
++                    }
++
++                    @Override
++                    public void onFinishingTabClosure(Tab tab) {
++                        forgetClosedTab(tab);
++                    }
++
++                    @Override
++                    public void onFinishingTabClosure(Tab tab, int closingSource) {
++                        forgetClosedTab(tab);
++                    }
++                };
++        getModel().addObserver(mTabModelObserver);
++        syncActiveWithSelectedTab();
++        forgetLostTabs();
++    }
++
++    /**
++     * Makes the workspace on screen the selected tab's. The strip and the rail show only the
++     * current workspace's tabs, so if the two ever disagree -- a selection made before this
++     * controller existed -- the tab being looked at would be hidden.
++     */
++    private void syncActiveWithSelectedTab() {
++        if (!Workspaces.isEnabled()) return;
++        TabModel model = getModel();
++        Tab tab = model.getTabAt(model.index());
++        if (tab == null) return;
++        Workspaces.setActiveId(Workspaces.getWorkspaceOfTab(tab.getId()));
++        Workspaces.noteSelectedTab(tab.getId());
++    }
++
++    /**
++     * Drops a closed tab's workspace -- unless the tab was only moved to the archive of inactive
++     * tabs, which restores it under the same id, back into the workspace it left.
++     */
++    private void forgetClosedTab(Tab tab) {
++        TabModel archived =
++                ArchivedTabModelOrchestrator.getForProfile(tab.getProfile().getOriginalProfile())
++                        .getTabModel();
++        if (archived != null && archived.getTabById(tab.getId()) != null) return;
++        Workspaces.forgetTab(tab.getId());
++    }
++
++    /**
++     * Forgets the workspaces of tabs that did not come back after a restart: Chrome does not keep
++     * a new tab page left in the background, for one. The archive of inactive tabs holds tabs that
++     * keep their workspace too, so this waits for it to load. It runs only with a single window, as
++     * the tabs of other windows are not visible from here.
++     */
++    private void forgetLostTabs() {
++        if (mDestroyed || MultiWindowUtils.getInstanceCount(PersistedInstanceType.ANY) > 1) return;
++        Profile profile = getModel().getProfile();
++        if (profile == null) return;
++        ArchivedTabModelOrchestrator archive = mArchive;
++        if (archive == null) {
++            archive = ArchivedTabModelOrchestrator.getForProfile(profile);
++            mArchive = archive;
++        }
++        TabModelSelector archiveSelector = archive.getTabModelSelector();
++        if (archiveSelector == null) {
++            // The archive is set up a little after startup; this runs again once it is.
++            archive.addObserver(mArchiveObserver);
++            return;
++        }
++        archive.removeObserver(mArchiveObserver);
++        TabModelUtils.runOnTabStateInitialized(
++                () -> {
++                    if (mDestroyed) return;
++                    Set<Integer> liveTabIds = new HashSet<>();
++                    for (Tab tab : getModel()) liveTabIds.add(tab.getId());
++                    for (Tab tab : archiveSelector.getModel(/* incognito= */ false)) {
++                        liveTabIds.add(tab.getId());
++                    }
++                    Workspaces.retainTabs(liveTabIds);
++                },
++                mTabModelSelector,
++                archiveSelector);
++    }
++
++    public void destroy() {
++        mDestroyed = true;
++        getModel().removeObserver(mTabModelObserver);
++        if (mArchive != null) mArchive.removeObserver(mArchiveObserver);
++        if (mMenuWindow != null) mMenuWindow.dismiss();
++        KEY.detachFromAllHosts(this);
++    }
++
++    private TabModel getModel() {
++        return mTabModelSelector.getModel(/* incognito= */ false);
++    }
++
++    private void onTabSelected(Tab tab, @TabSelectionType int type, int lastId) {
++        if (!Workspaces.isEnabled() || tab.isIncognito() || mSelecting) return;
++        String workspace = Workspaces.getWorkspaceOfTab(tab.getId());
++        if (!workspace.equals(Workspaces.getActiveId())) {
++            // Chrome picks a neighbour of a closed tab, which may belong to another workspace.
++            // Closing a tab should not carry the user out of the workspace they are in.
++            if (type == TabSelectionType.FROM_CLOSE && keepSelectionInActiveWorkspace()) return;
++            // Otherwise the tab was chosen deliberately -- from the tab switcher, a link from
++            // another app -- and the workspace follows it.
++            Workspaces.setActiveId(workspace);
++        }
++        Workspaces.noteSelectedTab(tab.getId());
++    }
++
++    /**
++     * Moves the selection to the tab of the current workspace nearest the current one, or, when the
++     * workspace has just lost its last tab, gives it a new one.
++     */
++    private boolean keepSelectionInActiveWorkspace() {
++        TabModel model = getModel();
++        String active = Workspaces.getActiveId();
++        int current = model.index();
++        Tab best = null;
++        int bestDistance = Integer.MAX_VALUE;
++        for (int i = 0; i < model.getCount(); i++) {
++            Tab candidate = model.getTabAt(i);
++            if (candidate == null || candidate.isClosing()) continue;
++            if (!Workspaces.getWorkspaceOfTab(candidate.getId()).equals(active)) continue;
++            int distance = Math.abs(i - current);
++            if (distance < bestDistance) {
++                best = candidate;
++                bestDistance = distance;
++            }
++        }
++        if (best != null) {
++            select(best);
++            return true;
++        }
++        openNewTab();
++        return true;
++    }
++
++    private void select(Tab tab) {
++        TabModel model = getModel();
++        int index = model.indexOf(tab);
++        if (index < 0) return;
++        mSelecting = true;
++        try {
++            model.setIndex(index, TabSelectionType.FROM_USER);
++        } finally {
++            mSelecting = false;
++        }
++        Workspaces.noteSelectedTab(tab.getId());
++    }
++
++    private void openNewTab() {
++        // The new tab joins the current workspace as it is created (see TabImpl).
++        TabCreatorUtil.launchNtp(getModel().getTabCreator());
++    }
++
++    /** The tabs of {@code workspaceId}, in strip order. */
++    private List<Tab> getTabs(String workspaceId) {
++        TabModel model = getModel();
++        List<Tab> tabs = new ArrayList<>();
++        for (int i = 0; i < model.getCount(); i++) {
++            Tab tab = model.getTabAt(i);
++            if (tab == null || tab.isClosing()) continue;
++            if (Workspaces.getWorkspaceOfTab(tab.getId()).equals(workspaceId)) tabs.add(tab);
++        }
++        return tabs;
++    }
++
++    /** Makes {@code workspaceId} current and shows the tab last used there. */
++    public void switchTo(String workspaceId) {
++        if (workspaceId.equals(Workspaces.getActiveId())) return;
++        Workspaces.setActiveId(workspaceId);
++        List<Tab> tabs = getTabs(workspaceId);
++        if (tabs.isEmpty()) {
++            openNewTab();
++            return;
++        }
++        Workspace workspace = Workspaces.get(workspaceId);
++        Tab target = tabs.get(0);
++        if (workspace != null) {
++            for (Tab tab : tabs) {
++                if (tab.getId() == workspace.lastTabId) target = tab;
++            }
++        }
++        select(target);
++    }
++
++    private void createWorkspace() {
++        switchTo(Workspaces.create(/* name= */ null).id);
++    }
++
++    /**
++     * Moves {@code tabs} into workspace {@code workspaceId}, and their pages into its storage. A tab
++     * leaves its group unless the whole group goes with it. The workspace on screen stays: if the
++     * selected tab went, the selection moves to the nearest tab left.
++     */
++    public void moveTabsToWorkspace(List<Tab> tabs, String workspaceId) {
++        TabModel model = getModel();
++        List<Tab> moving = new ArrayList<>();
++        for (Tab tab : tabs) {
++            if (!tab.isClosing() && !tab.isIncognito() && model.indexOf(tab) >= 0) moving.add(tab);
++        }
++        if (moving.isEmpty() || Workspaces.get(workspaceId) == null) return;
++
++        List<Tab> leavingGroups = new ArrayList<>();
++        for (Tab tab : moving) {
++            Token groupId = tab.getTabGroupId();
++            if (groupId != null && !moving.containsAll(model.getTabsInGroup(groupId))) {
++                leavingGroups.add(tab);
++            }
++        }
++        if (!leavingGroups.isEmpty()) {
++            model.getTabUngrouper()
++                    .ungroupTabs(leavingGroups, /* trailing= */ true, /* allowDialog= */ false);
++        }
++
++        Tab selected = model.getTabAt(model.index());
++        for (Tab tab : moving) Workspaces.setWorkspaceOfTab(tab.getId(), workspaceId);
++        if (selected != null
++                && moving.contains(selected)
++                && !workspaceId.equals(Workspaces.getActiveId())) {
++            keepSelectionInActiveWorkspace();
++        }
++        // Once out of sight, so the pages are rebuilt without being shown.
++        for (Tab tab : moving) TabUtils.moveToWorkspaceStorage(tab);
++    }
++
++    /**
++     * The tab menu's "Move to workspace" entry for {@code tabs}, with the other workspaces and a
++     * new one in its submenu; null for tabs that take no part in workspaces.
++     */
++    public @Nullable ListItem createMoveToWorkspaceItem(List<Tab> tabs) {
++        if (!Workspaces.isEnabled() || tabs.isEmpty() || tabs.get(0).isIncognito()) return null;
++        String from = Workspaces.getWorkspaceOfTab(tabs.get(0).getId());
++        List<ListItem> submenuItems = new ArrayList<>();
++        for (Workspace workspace : Workspaces.getAll()) {
++            if (workspace.id.equals(from)) continue;
++            submenuItems.add(
++                    new ListItemBuilder()
++                            .withTitle(workspace.name)
++                            .withStartIconDrawable(createCheckSpacer())
++                            .withShouldTintIcon(false)
++                            .withIsTextEllipsizedAtEnd(true)
++                            .withClickListener(v -> moveTabsToWorkspace(tabs, workspace.id))
++                            .build());
++        }
++        submenuItems.add(
++                new ListItemBuilder()
++                        .withTitleRes(R.string.workspace_new)
++                        .withStartIconRes(R.drawable.ic_add_24dp)
++                        .withClickListener(
++                                v ->
++                                        moveTabsToWorkspace(
++                                                tabs, Workspaces.create(/* name= */ null).id))
++                        .build());
++        return new ListItemBuilder()
++                .withTitle(
++                        mActivity
++                                .getResources()
++                                .getQuantityString(R.plurals.workspace_move_tabs, tabs.size()))
++                .withSubmenuItems(submenuItems)
++                .build();
++    }
++
++    // Menu.
++
++    /** Shows the workspace menu anchored to {@code anchor}. */
++    public void showMenu(RectProvider anchor) {
++        if (mMenuWindow != null && mMenuWindow.isShowing()) return;
++        Context context = mActivity;
++        ModelList modelList = new ModelList();
++        buildMenu(modelList);
++
++        View contentView =
++                LayoutInflater.from(context).inflate(R.layout.tab_switcher_action_menu_layout, null);
++        ListMenuUtils.clipContentViewOutline(contentView, R.attr.popupBgCornerRadius);
++        TouchTrackingListView listView = contentView.findViewById(R.id.tab_group_action_menu_list);
++        ListMenuItemAdapter adapter =
++                createAdapter(
++                        modelList,
++                        Set.of(),
++                        (model, view) -> {
++                            if (mMenuWindow != null) mMenuWindow.dismiss();
++                            View.OnClickListener listener = model.get(CLICK_LISTENER);
++                            if (listener != null) listener.onClick(view);
++                        });
++        listView.setItemsCanFocus(true);
++        listView.setAdapter(adapter);
++
++        int[] contentDimensions = UiUtils.computeListAdapterContentDimensions(adapter, listView);
++        int minWidthPx =
++                context.getResources().getDimensionPixelSize(R.dimen.tab_strip_context_menu_min_width);
++        int maxWidthPx =
++                context.getResources().getDimensionPixelSize(R.dimen.tab_strip_context_menu_max_width);
++        int widthPx = MathUtils.clamp(contentDimensions[0], minWidthPx, maxWidthPx);
++
++        Drawable background =
++                TabOverflowMenuCoordinator.getMenuBackground(context, /* isIncognito= */ false);
++        mMenuWindow =
++                new AnchoredPopupWindow.Builder(
++                                context,
++                                mActivity.getWindow().getDecorView(),
++                                background,
++                                () -> contentView,
++                                anchor)
++                        .setFocusable(true)
++                        .setOutsideTouchable(true)
++                        .setHorizontalOverlapAnchor(true)
++                        .setVerticalOverlapAnchor(false)
++                        .setAllowOverlapCaptionBar(true)
++                        .setPreferredHorizontalOrientation(HorizontalOrientation.LAYOUT_DIRECTION)
++                        .setMaxWidth(maxWidthPx)
++                        .setDesiredContentWidth(widthPx)
++                        .setElevation(
++                                context.getResources()
++                                        .getDimension(R.dimen.tab_overflow_menu_elevation))
++                        .setAnimateFromAnchor(true)
++                        .build();
++        mMenuWindow.show();
++    }
++
++    private void buildMenu(ModelList modelList) {
++        Context context = mActivity;
++        Workspace active = Workspaces.getActive();
++        // Laid out as on the desktop build: the spaces, the one on screen checked; creating and
++        // deleting one; then the settings of the space on screen.
++        for (Workspace workspace : Workspaces.getAll()) {
++            String title =
++                    context.getString(
++                            R.string.workspace_tab_count,
++                            workspace.name,
++                            getTabs(workspace.id).size());
++            ListItemBuilder item =
++                    new ListItemBuilder()
++                            .withTitle(title)
++                            .withIsTextEllipsizedAtEnd(true)
++                            .withClickListener(v -> switchTo(workspace.id));
++            if (workspace.id.equals(active.id)) {
++                item.withStartIconRes(R.drawable.ic_check_googblue_24dp)
++                        .withContentDescription(
++                                context.getString(R.string.workspace_current, title));
++            } else {
++                item.withStartIconDrawable(createCheckSpacer()).withShouldTintIcon(false);
++            }
++            modelList.add(item.build());
++        }
++        modelList.add(BasicListMenu.buildMenuDivider(/* isIncognito= */ false));
++        modelList.add(
++                new ListItemBuilder()
++                        .withTitleRes(R.string.workspace_new)
++                        .withStartIconRes(R.drawable.ic_add_24dp)
++                        .withClickListener(v -> createWorkspace())
++                        .build());
++        modelList.add(
++                new ListItemBuilder()
++                        .withTitleRes(R.string.workspace_delete)
++                        .withStartIconRes(R.drawable.ic_delete_24dp)
++                        // The default space holds every tab never given another one.
++                        .withEnabled(!Workspaces.DEFAULT_ID.equals(active.id))
++                        .withClickListener(v -> showDeleteDialog(active.id))
++                        .build());
++        modelList.add(BasicListMenu.buildMenuDivider(/* isIncognito= */ false));
++        modelList.add(
++                new ListItemBuilder()
++                        .withTitleRes(R.string.workspace_edit)
++                        .withStartIconRes(R.drawable.ic_settings_24dp)
++                        .withClickListener(v -> showEditDialog(active.id))
++                        .build());
++    }
++
++    /**
++     * A blank the size of the check, so every space's name lines up with the checked one's. Left
++     * untinted: a tint would fill it in.
++     */
++    private Drawable createCheckSpacer() {
++        int size = ViewUtils.dpToPx(mActivity, CHECK_SIZE_DP);
++        GradientDrawable spacer = new GradientDrawable();
++        spacer.setSize(size, size);
++        return spacer;
++    }
++
++    // Dialogs.
++
++    private void showEditDialog(String workspaceId) {
++        Workspace workspace = Workspaces.get(workspaceId);
++        if (workspace == null) return;
++        Context context = mActivity;
++        int padding = ViewUtils.dpToPx(context, DIALOG_PADDING_DP);
++
++        LinearLayout content = new LinearLayout(context);
++        content.setOrientation(LinearLayout.VERTICAL);
++        content.setPadding(padding, 0, padding, 0);
++
++        EditText name = new EditText(context);
++        name.setSingleLine(true);
++        name.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
++        name.setHint(R.string.workspace_name_hint);
++        name.setText(workspace.name);
++        name.setSelection(name.getText().length());
++        content.addView(name);
++
++        TextView colorHeading = new TextView(context);
++        colorHeading.setText(R.string.workspace_color);
++        colorHeading.setTextAppearance(R.style.TextAppearance_TextMediumThick_Primary);
++        colorHeading.setPadding(0, padding / 2, 0, padding / 3);
++        content.addView(colorHeading);
++
++        int[] chosenColor = {workspace.color};
++        content.addView(createColorGrid(workspace.color, color -> chosenColor[0] = color));
++
++        CheckBoxWithDescription storage = new CheckBoxWithDescription(context, /* attrs= */ null);
++        storage.setPrimaryText(context.getString(R.string.workspace_separate_storage));
++        storage.setChecked(workspace.separateStorage);
++        storage.setPadding(0, padding / 2, 0, 0);
++        content.addView(storage);
++
++        ModalDialogProperties.Controller controller =
++                new ModalDialogProperties.Controller() {
++                    @Override
++                    public void onClick(PropertyModel model, int buttonType) {
++                        if (buttonType == ModalDialogProperties.ButtonType.POSITIVE) {
++                            Workspaces.rename(workspaceId, name.getText().toString());
++                            Workspaces.setColor(workspaceId, chosenColor[0]);
++                            setSeparateStorage(workspaceId, storage.isChecked());
++                            mModalDialogManager.dismissDialog(
++                                    model, DialogDismissalCause.POSITIVE_BUTTON_CLICKED);
++                        } else {
++                            mModalDialogManager.dismissDialog(
++                                    model, DialogDismissalCause.NEGATIVE_BUTTON_CLICKED);
++                        }
++                    }
++
++                    @Override
++                    public void onDismiss(PropertyModel model, int dismissalCause) {}
++                };
++        PropertyModel model =
++                new PropertyModel.Builder(ModalDialogProperties.ALL_KEYS)
++                        .with(ModalDialogProperties.CONTROLLER, controller)
++                        .with(
++                                ModalDialogProperties.TITLE,
++                                context.getString(R.string.workspace_settings_title))
++                        .with(ModalDialogProperties.CUSTOM_VIEW, content)
++                        .with(
++                                ModalDialogProperties.POSITIVE_BUTTON_TEXT,
++                                context.getString(R.string.workspace_done))
++                        .with(
++                                ModalDialogProperties.NEGATIVE_BUTTON_TEXT,
++                                context.getString(R.string.cancel))
++                        .with(
++                                ModalDialogProperties.BUTTON_STYLES,
++                                ModalDialogProperties.ButtonStyles.PRIMARY_FILLED_NEGATIVE_OUTLINE)
++                        .build();
++        mModalDialogManager.showDialog(model, ModalDialogType.APP);
++    }
++
++    /**
++     * The colours a space can take: the browser's own theme colours, the new tab page's Chrome
++     * colors, drawn and picked by that picker's adapter, as the desktop build offers Customize
++     * Chrome's. The first, the default palette, stands for no colour. The items are a size down
++     * from the new tab page's, so all ten fit in two rows.
++     */
++    private RecyclerView createColorGrid(int selectedColor, Callback<Integer> onColorPicked) {
++        Context context = mActivity;
++        List<NtpThemeColorInfo> colorInfos = new ArrayList<>();
++        List<Integer> colors = new ArrayList<>();
++        NtpThemeColorInfo noColor = new NtpThemeColorInfo(context, NtpThemeColorId.DEFAULT);
++        noColor.colorStringResId = R.string.workspace_no_color;
++        colorInfos.add(noColor);
++        colors.add(Workspaces.NO_COLOR);
++        for (int id = NtpThemeColorId.DEFAULT + 1; id < NtpThemeColorId.NUM_ENTRIES; id++) {
++            colorInfos.add(new NtpThemeColorInfo(context, id));
++            colors.add(id);
++        }
++
++        int itemSize = ViewUtils.dpToPx(context, COLOR_ITEM_SIZE_DP);
++        int circleSize = ViewUtils.dpToPx(context, COLOR_CIRCLE_SIZE_DP);
++        int margin = ViewUtils.dpToPx(context, COLOR_ITEM_MARGIN_DP);
++        int cellWidth = itemSize + 2 * margin;
++        GridLayoutManager layoutManager = new GridLayoutManager(context, 1);
++        RecyclerView grid =
++                new RecyclerView(context) {
++                    @Override
++                    protected void onMeasure(int widthSpec, int heightSpec) {
++                        // As many to a row as fit, the grid as wide as its rows, as on the new
++                        // tab page.
++                        int width = MeasureSpec.getSize(widthSpec);
++                        if (width > 0) {
++                            int spanCount = Math.max(1, width / cellWidth);
++                            if (layoutManager.getSpanCount() != spanCount) {
++                                layoutManager.setSpanCount(spanCount);
++                            }
++                            widthSpec =
++                                    MeasureSpec.makeMeasureSpec(
++                                            spanCount * cellWidth, MeasureSpec.EXACTLY);
++                        }
++                        super.onMeasure(widthSpec, heightSpec);
++                    }
++                };
++        grid.setLayoutManager(layoutManager);
++        grid.setNestedScrollingEnabled(false);
++        grid.setAdapter(
++                new NtpChromeColorsAdapter(
++                        context,
++                        colorInfos,
++                        info -> onColorPicked.onResult(colors.get(colorInfos.indexOf(info))),
++                        Math.max(0, colors.indexOf(selectedColor))) {
++                    @Override
++                    public ColorViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
++                        ColorViewHolder holder = super.onCreateViewHolder(parent, viewType);
++                        ViewGroup.MarginLayoutParams params =
++                                (ViewGroup.MarginLayoutParams) holder.itemView.getLayoutParams();
++                        params.width = itemSize;
++                        params.height = itemSize;
++                        params.setMargins(margin, margin, margin, margin);
++                        ViewGroup.LayoutParams circle =
++                                holder.itemView.findViewById(R.id.color_circle).getLayoutParams();
++                        circle.width = circleSize;
++                        circle.height = circleSize;
++                        return holder;
++                    }
++                });
++        LinearLayout.LayoutParams params =
++                new LinearLayout.LayoutParams(
++                        LinearLayout.LayoutParams.WRAP_CONTENT,
++                        LinearLayout.LayoutParams.WRAP_CONTENT);
++        params.gravity = Gravity.CENTER_HORIZONTAL;
++        grid.setLayoutParams(params);
++        return grid;
++    }
++
++    /**
++     * The colour a space wears on the strip's button and the rail's card: its Chrome color's, or
++     * null for none.
++     */
++    public static @Nullable @ColorInt Integer getSpaceColor(Context context, int color) {
++        if (color <= NtpThemeColorId.DEFAULT || color >= NtpThemeColorId.NUM_ENTRIES) return null;
++        return context.getColor(NtpThemeColorUtils.getNtpThemePrimaryColorResId(color));
++    }
++
++    /**
++     * Gives a workspace storage of its own or takes it away, and moves the pages open in it into
++     * the storage they now belong in.
++     */
++    private void setSeparateStorage(String workspaceId, boolean separate) {
++        Workspace workspace = Workspaces.get(workspaceId);
++        if (workspace == null || workspace.separateStorage == separate) return;
++        Workspaces.setSeparateStorage(workspaceId, separate);
++        for (Tab tab : getTabs(workspaceId)) {
++            TabUtils.moveToWorkspaceStorage(tab);
++        }
++    }
++
++    private void showDeleteDialog(String workspaceId) {
++        Workspace workspace = Workspaces.get(workspaceId);
++        if (workspace == null || Workspaces.DEFAULT_ID.equals(workspaceId)) return;
++        Context context = mActivity;
++        int tabCount = getTabs(workspaceId).size();
++        String message =
++                tabCount == 1
++                        ? context.getString(R.string.workspace_delete_message_one)
++                        : context.getString(R.string.workspace_delete_message_many, tabCount);
++        ModalDialogProperties.Controller controller =
++                new ModalDialogProperties.Controller() {
++                    @Override
++                    public void onClick(PropertyModel model, int buttonType) {
++                        if (buttonType == ModalDialogProperties.ButtonType.POSITIVE) {
++                            deleteWorkspace(workspaceId);
++                            mModalDialogManager.dismissDialog(
++                                    model, DialogDismissalCause.POSITIVE_BUTTON_CLICKED);
++                        } else {
++                            mModalDialogManager.dismissDialog(
++                                    model, DialogDismissalCause.NEGATIVE_BUTTON_CLICKED);
++                        }
++                    }
++
++                    @Override
++                    public void onDismiss(PropertyModel model, int dismissalCause) {}
++                };
++        PropertyModel model =
++                new PropertyModel.Builder(ModalDialogProperties.ALL_KEYS)
++                        .with(ModalDialogProperties.CONTROLLER, controller)
++                        .with(
++                                ModalDialogProperties.TITLE,
++                                context.getString(R.string.workspace_delete_title, workspace.name))
++                        .with(ModalDialogProperties.MESSAGE_PARAGRAPH_1, message)
++                        .with(
++                                ModalDialogProperties.POSITIVE_BUTTON_TEXT,
++                                context.getString(R.string.workspace_delete_confirm))
++                        .with(
++                                ModalDialogProperties.NEGATIVE_BUTTON_TEXT,
++                                context.getString(R.string.cancel))
++                        .with(
++                                ModalDialogProperties.BUTTON_STYLES,
++                                ModalDialogProperties.ButtonStyles.PRIMARY_FILLED_NEGATIVE_OUTLINE)
++                        .build();
++        mModalDialogManager.showDialog(model, ModalDialogType.APP);
++    }
++
++    private void deleteWorkspace(String workspaceId) {
++        List<Tab> tabs = getTabs(workspaceId);
++        // Leave the workspace before its tabs go, so closing them does not pull the selection
++        // around inside it.
++        if (workspaceId.equals(Workspaces.getActiveId())) switchTo(Workspaces.DEFAULT_ID);
++        if (!tabs.isEmpty()) {
++            getModel()
++                    .getTabRemover()
++                    .closeTabs(
++                            TabClosureParams.closeTabs(tabs).allowUndo(false).build(),
++                            /* allowDialog= */ false);
++        }
++        if (!Workspaces.delete(workspaceId)) return;
++        // What the workspace stored goes with it.
++        Profile profile = getModel().getProfile();
++        if (profile != null) WebContentsFactory.clearWorkspacePartition(profile, workspaceId);
++    }
++}
+--- a/chrome/browser/android/BUILD.gn
++++ b/chrome/browser/android/BUILD.gn
+@@ -720,6 +720,7 @@ if (is_android) {
+       "//components/webapps/browser/android:pwa_restore_bottom_sheet_mediator_jni_headers",
+       "//components/webauthn/android",
+       "//content/public/browser",
++      "//crypto",
+       "//device/fido:cablev2_registration",
+       "//ipc:param_traits",
+       "//media/mojo/clients",
+--- a/chrome/browser/android/content/java/src/org/chromium/chrome/browser/content/WebContentsFactory.java
++++ b/chrome/browser/android/content/java/src/org/chromium/chrome/browser/content/WebContentsFactory.java
+@@ -104,6 +104,46 @@ public class WebContentsFactory {
+     }
+ 
+     /**
++     * Builds a {@link WebContents} whose cookies and site data live in the named persistent
++     * partition instead of the profile's own, as a workspace with separate storage needs.
++     *
++     * @param partitionName The partition to use, or null for the profile's own storage.
++     */
++    public static WebContents createWebContents(
++            Profile profile,
++            boolean initiallyHidden,
++            boolean initializeRenderer,
++            @Nullable String partitionName) {
++        if (partitionName == null || partitionName.isEmpty()) {
++            return createWebContents(profile, initiallyHidden, initializeRenderer);
++        }
++        if (sWebContentsForTesting != null) {
++            return sWebContentsForTesting;
++        }
++        return WebContentsFactoryJni.get()
++                .createWebContentsInPartition(
++                        profile,
++                        partitionName,
++                        initiallyHidden,
++                        initializeRenderer,
++                        new WebContentsCreationException());
++    }
++
++    /**
++     * Returns the workspace partition {@code webContents} keeps its storage in, or null when it
++     * uses the profile's own.
++     */
++    public static @Nullable String getWorkspacePartition(WebContents webContents) {
++        String partitionName = WebContentsFactoryJni.get().getWorkspacePartition(webContents);
++        return partitionName.isEmpty() ? null : partitionName;
++    }
++
++    /** Deletes everything stored in the partition of a workspace that no longer exists. */
++    public static void clearWorkspacePartition(Profile profile, String partitionName) {
++        WebContentsFactoryJni.get().clearWorkspacePartition(profile, partitionName);
++    }
++
++    /**
+      * A factory method to build a {@link WebContents} object.
+      *
+      * <p>Also creates and initializes the renderer.
+@@ -134,5 +174,20 @@ public class WebContentsFactory {
+ 
+         WebContents createWebContentsWithSeparateStoragePartitionForExperiment(
+                 @JniType("Profile*") Profile profile, Throwable javaCreator);
++
++        WebContents createWebContentsInPartition(
++                @JniType("Profile*") Profile profile,
++                @JniType("std::string") String partitionName,
++                boolean initiallyHidden,
++                boolean initializeRenderer,
++                Throwable javaCreator);
++
++        @JniType("std::string")
++        String getWorkspacePartition(
++                @JniType("content::WebContents*") WebContents webContents);
++
++        void clearWorkspacePartition(
++                @JniType("Profile*") Profile profile,
++                @JniType("std::string") String partitionName);
+     }
+ }
+--- a/chrome/browser/android/content/web_contents_factory.cc
++++ b/chrome/browser/android/content/web_contents_factory.cc
+@@ -3,13 +3,30 @@
+ // found in the LICENSE file.
+ 
+ #include "base/android/jni_android.h"
++#include "base/android/jni_string.h"
++#include "base/barrier_closure.h"
++#include "base/check_op.h"
++#include "base/containers/span.h"
++#include "base/files/file_path.h"
++#include "base/files/file_util.h"
++#include "base/functional/bind.h"
++#include "base/functional/callback_helpers.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/task/thread_pool.h"
++#include "base/time/time.h"
+ #include "chrome/browser/android/content/web_contents_factory_data_deleter.h"
+ #include "chrome/browser/browser_process.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "content/public/browser/security_principal.h"
+ #include "content/public/browser/site_instance.h"
++#include "content/public/browser/storage_partition.h"
+ #include "content/public/browser/storage_partition_config.h"
+ #include "content/public/browser/web_contents.h"
++#include "crypto/hash.h"
++#include "services/network/public/mojom/clear_data_filter.mojom.h"
++#include "services/network/public/mojom/network_context.mojom.h"
++#include "third_party/blink/public/common/storage_key/storage_key.h"
++#include "url/url_constants.h"
+ 
+ // Must come after all headers that specialize FromJniType() / ToJniType().
+ #include "chrome/browser/android/content/jni_headers/WebContentsFactory_jni.h"
+@@ -17,6 +34,37 @@
+ using base::android::JavaRef;
+ using base::android::ScopedJavaLocalRef;
+ 
++namespace {
++
++// The domain of the StoragePartitions workspaces keep their tabs' storage in,
++// each named after its workspace. WebContentsState and the browsing data
++// remover use the same.
++constexpr char kWorkspacePartitionDomain[] = "workspace";
++
++// Where content keeps the partition `partition_name`: the layout of
++// StoragePartitionImplMap::GetStoragePartitionPath(), which is internal to
++// content. Computed rather than asked for, so a partition that isn't loaded is
++// never created only to be deleted.
++base::FilePath GetWorkspacePartitionPath(Profile* profile,
++                                         const std::string& partition_name) {
++  constexpr size_t kPartitionNameHashBytes = 6;
++  auto hash = crypto::hash::Sha256(partition_name);
++  return profile->GetPath()
++      .AppendASCII("Storage")
++      .AppendASCII("ext")
++      .AppendASCII(kWorkspacePartitionDomain)
++      .AppendASCII(
++          base::HexEncode(base::span(hash).first<kPartitionNameHashBytes>()));
++}
++
++void DeleteWorkspacePartitionDirectory(const base::FilePath& path) {
++  base::ThreadPool::PostTask(
++      FROM_HERE, {base::MayBlock(), base::TaskPriority::BEST_EFFORT},
++      base::GetDeletePathRecursivelyCallback(path));
++}
++
++}  // namespace
++
+ static ScopedJavaLocalRef<jobject> JNI_WebContentsFactory_CreateWebContents(
+     JNIEnv* env,
+     Profile* profile,
+@@ -40,6 +88,84 @@ static ScopedJavaLocalRef<jobject> JNI_W
+   return content::WebContents::Create(params).release()->GetJavaWebContents();
+ }
+ 
++// A workspace's tabs keep their cookies and site data in a partition named
++// after the workspace, so being signed in to a site in one workspace says
++// nothing about any other. The partition is persistent and fixed for the
++// WebContents' lifetime: it carries across navigations and is what a restored
++// tab is rebuilt in (see WebContentsState, which uses the same domain).
++static ScopedJavaLocalRef<jobject>
++JNI_WebContentsFactory_CreateWebContentsInPartition(
++    JNIEnv* env,
++    Profile* profile,
++    const std::string& partition_name,
++    bool initially_hidden,
++    bool initialize_renderer,
++    const JavaRef<jthrowable>& j_creator_location) {
++  auto partition_config = content::StoragePartitionConfig::Create(
++      profile, kWorkspacePartitionDomain, partition_name, /*in_memory=*/false);
++  // Start from about:blank, as a <webview> guest does, so the first
++  // SiteInstance is a well-formed one in the workspace partition.
++  auto site_instance = content::SiteInstance::CreateForFixedStoragePartition(
++      profile, GURL(url::kAboutBlankURL), partition_config);
++
++  content::WebContents::CreateParams params(profile, std::move(site_instance));
++  params.initially_hidden = initially_hidden;
++  params.desired_renderer_state =
++      initialize_renderer
++          ? content::WebContents::CreateParams::
++                kInitializeAndWarmupRendererProcess
++          : content::WebContents::CreateParams::kOkayToHaveRendererProcess;
++  params.java_creator_location = j_creator_location;
++
++  // Ownership is passed into java, and then to TabAndroid::InitWebContents.
++  return content::WebContents::Create(params).release()->GetJavaWebContents();
++}
++
++// The workspace partition `web_contents` keeps its storage in, or an empty
++// string when it uses the profile's own.
++static std::string JNI_WebContentsFactory_GetWorkspacePartition(
++    JNIEnv* env,
++    content::WebContents* web_contents) {
++  const content::StoragePartitionConfig& config =
++      web_contents->GetSiteInstance()
++          ->GetSecurityPrincipal()
++          .GetStoragePartitionConfig();
++  return config.partition_domain() == kWorkspacePartitionDomain
++             ? config.partition_name()
++             : std::string();
++}
++
++// Deletes everything a workspace kept in its partition -- cookies, site data
++// and caches -- and then the partition's directory, once the workspace is
++// gone. content keeps a partition's directory for good, so it is removed here,
++// as Brave does for its containers.
++static void JNI_WebContentsFactory_ClearWorkspacePartition(
++    JNIEnv* env,
++    Profile* profile,
++    const std::string& partition_name) {
++  base::FilePath path = GetWorkspacePartitionPath(profile, partition_name);
++  content::StoragePartition* partition = profile->GetStoragePartition(
++      content::StoragePartitionConfig::Create(
++          profile, kWorkspacePartitionDomain, partition_name,
++          /*in_memory=*/false),
++      /*can_create=*/false);
++  if (!partition) {
++    DeleteWorkspacePartitionDirectory(path);
++    return;
++  }
++  DCHECK_EQ(partition->GetPath(), path);
++
++  // The directory goes once both clears are done.
++  base::RepeatingClosure cleared = base::BarrierClosure(
++      2, base::BindOnce(&DeleteWorkspacePartitionDirectory, path));
++  // An empty StorageKey has an opaque origin, which clears every origin.
++  partition->ClearData(content::StoragePartition::REMOVE_DATA_MASK_ALL,
++                       blink::StorageKey(), base::Time(), base::Time::Max(),
++                       cleared);
++  partition->GetNetworkContext()->ClearHttpCache(
++      base::Time(), base::Time::Max(), /*filter=*/nullptr, cleared);
++}
++
+ static ScopedJavaLocalRef<jobject>
+ JNI_WebContentsFactory_CreateWebContentsWithSeparateStoragePartitionForExperiment(
+     JNIEnv* env,
+--- a/chrome/browser/browsing_data/BUILD.gn
++++ b/chrome/browser/browsing_data/BUILD.gn
+@@ -197,6 +197,7 @@ source_set("impl") {
+       "//chrome/browser/feed",
+       "//chrome/browser/settings:jni_headers",
+       "//chrome/browser/ui/android/tab_model",
++      "//chrome/browser/ui/vertical_tabs:jni_headers",
+       "//components/installedapp/android:jni_headers",
+     ]
+   }
+--- a/chrome/browser/browsing_data/chrome_browsing_data_remover_delegate.cc
++++ b/chrome/browser/browsing_data/chrome_browsing_data_remover_delegate.cc
+@@ -171,6 +171,9 @@
+ #include "third_party/perfetto/include/perfetto/tracing/track.h"
+ 
+ #if BUILDFLAG(IS_ANDROID)
++#include "base/android/jni_android.h"
++#include "base/android/jni_array.h"
++#include "base/android/jni_string.h"
+ #include "chrome/browser/android/customtabs/chrome_origin_verifier.h"
+ #include "chrome/browser/android/oom_intervention/oom_intervention_decider.h"
+ #include "chrome/browser/android/webapps/webapp_registry.h"
+@@ -181,12 +184,14 @@
+ #include "chrome/browser/share/share_ranking.h"
+ #include "chrome/browser/ui/android/tab_model/tab_model.h"
+ #include "chrome/browser/ui/android/tab_model/tab_model_list.h"
++#include "chrome/browser/ui/vertical_tabs/jni_headers/Workspaces_jni.h"
+ #include "components/cdm/browser/media_drm_storage_impl.h"  // nogncheck crbug.com/40147906
+ #include "components/feed/core/v2/public/feed_service.h"    // nogncheck
+ #include "components/feed/feed_feature_list.h"
+ #include "components/installedapp/android/jni_headers/PackageHash_jni.h"
+ #include "components/offline_pages/core/offline_page_feature.h"
+ #include "components/offline_pages/core/offline_page_model.h"
++#include "content/public/browser/storage_partition_config.h"
+ #endif  // BUILDFLAG(IS_ANDROID)
+ 
+ #if !BUILDFLAG(IS_ANDROID)
+@@ -1466,6 +1471,38 @@ void ChromeBrowsingDataRemoverDelegate::
+   }
+ #endif  // !BUILDFLAG(IS_ANDROID)
+ 
++#if BUILDFLAG(IS_ANDROID)
++  //////////////////////////////////////////////////////////////////////////////
++  // Workspaces.
++  // A workspace can keep its tabs' cookies and site data in a StoragePartition
++  // of its own. Unless the filter already names a StoragePartition, repeat the
++  // removal of the data types that live on one in each workspace's partition,
++  // with the same filter, so that clearing browsing data reaches every
++  // workspace and not only the profile's own storage.
++  const uint64_t workspace_remove_mask =
++      content::BrowsingDataRemover::DATA_TYPE_ON_STORAGE_PARTITION &
++      remove_mask;
++  if (workspace_remove_mask &&
++      !filter_builder->GetStoragePartitionConfig().has_value() &&
++      !profile_->IsOffTheRecord()) {
++    for (const std::string& partition_name :
++         Java_Workspaces_getStoragePartitions(
++             base::android::AttachCurrentThread())) {
++      std::unique_ptr<BrowsingDataFilterBuilder> workspace_filter_builder =
++          filter_builder->Copy();
++      workspace_filter_builder->SetStoragePartitionConfig(
++          content::StoragePartitionConfig::Create(
++              profile_, /*partition_domain=*/"workspace", partition_name,
++              /*in_memory=*/false));
++      // As for Isolated Web Apps, the removal is queued rather than awaited:
++      // BrowsingDataRemover doesn't support nested Remove calls.
++      profile_->GetBrowsingDataRemover()->RemoveWithFilter(
++          delete_begin, delete_end, workspace_remove_mask, origin_type_mask,
++          std::move(workspace_filter_builder));
++    }
++  }
++#endif  // BUILDFLAG(IS_ANDROID)
++
+   //////////////////////////////////////////////////////////////////////////////
+   // DATA_TYPE_TABS
+   if (remove_mask & constants::DATA_TYPE_TABS) {
+@@ -1782,4 +1819,5 @@ void ChromeBrowsingDataRemoverDelegate::
+ #if BUILDFLAG(IS_ANDROID)
+ DEFINE_JNI(PackageHash)
+ DEFINE_JNI(RecentSearchQueue)
++DEFINE_JNI(Workspaces)
+ #endif
+--- a/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
++++ b/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
+@@ -468,6 +468,13 @@ public final class ChromePreferenceKeys
+     /** Whether each row in the vertical tab rail carries a close button. */
+     public static final String VERTICAL_TABS_SHOW_CLOSE = "vertical_tabs_show_close";
+ 
++    /** Workspaces: whether they are on, their records, the current one and each tab's. */
++    public static final String WORKSPACES_ENABLED = "workspaces_enabled";
++
++    public static final String WORKSPACES_LIST = "workspaces_list";
++    public static final String WORKSPACES_ACTIVE = "workspaces_active";
++    public static final String WORKSPACES_TABS = "workspaces_tabs";
++
+     /** Keys used to save settings related to homepage. */
+     public static final String DEPRECATED_HOMEPAGE_CUSTOM_URI = "homepage_custom_uri";
+ 
+--- a/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/LegacyChromePreferenceKeys.java
++++ b/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/LegacyChromePreferenceKeys.java
+@@ -64,6 +64,10 @@ public class LegacyChromePreferenceKeys
+                 ChromePreferenceKeys.FLAGS_MIN_TAB_WIDTH,
+                 ChromePreferenceKeys.VERTICAL_TABS_WIDTH,
+                 ChromePreferenceKeys.VERTICAL_TABS_SHOW_CLOSE,
++                ChromePreferenceKeys.WORKSPACES_ENABLED,
++                ChromePreferenceKeys.WORKSPACES_LIST,
++                ChromePreferenceKeys.WORKSPACES_ACTIVE,
++                ChromePreferenceKeys.WORKSPACES_TABS,
+                 ChromePreferenceKeys.FIRST_RUN_SKIP_WELCOME_PAGE,
+                 ChromePreferenceKeys.HISTORY_SHOW_HISTORY_INFO,
+                 ChromePreferenceKeys.HOMEPAGE_ENABLED,
+--- a/chrome/browser/profiles/android/profile_manager_utils.cc
++++ b/chrome/browser/profiles/android/profile_manager_utils.cc
+@@ -14,6 +14,7 @@
+ #include "content/public/browser/browser_context.h"
+ #include "content/public/browser/browser_thread.h"
+ #include "content/public/browser/storage_partition.h"
++#include "content/public/browser/storage_partition_config.h"
+ #include "services/network/public/mojom/cookie_manager.mojom.h"
+ 
+ // Must come after all headers that specialize FromJniType() / ToJniType().
+@@ -33,7 +34,15 @@ void CommitPendingWritesForProfile(Profi
+       ->GetCookieManagerForBrowserProcess()
+       ->FlushCookieStore(
+           network::mojom::CookieManager::FlushCookieStoreCallback());
+-  profile->ForEachLoadedStoragePartition(&content::StoragePartition::Flush);
++  profile->ForEachLoadedStoragePartition(
++      [](content::StoragePartition* partition) {
++        // Isolated workspaces keep their cookies in partitions of their own.
++        if (!partition->GetConfig().is_default()) {
++          partition->GetCookieManagerForBrowserProcess()->FlushCookieStore(
++              network::mojom::CookieManager::FlushCookieStoreCallback());
++        }
++        partition->Flush();
++      });
+ }
+ 
+ void RemoveSessionCookiesForProfile(Profile* profile) {
+--- a/chrome/browser/tab/java/src/org/chromium/chrome/browser/tab/WebContentsState.java
++++ b/chrome/browser/tab/java/src/org/chromium/chrome/browser/tab/WebContentsState.java
+@@ -305,8 +305,28 @@ public class WebContentsState {
+      */
+     public @Nullable WebContents restoreWebContents(
+             Profile profile, boolean isHidden, boolean noRenderer) {
++        return restoreWebContents(profile, isHidden, noRenderer, /* partitionName= */ null);
++    }
++
++    /**
++     * Creates a {@link WebContents} from the buffer in the named storage partition.
++     *
++     * @param partitionName The workspace partition the tab keeps its site data in, or null for
++     *     the profile's own storage.
++     */
++    public @Nullable WebContents restoreWebContents(
++            Profile profile,
++            boolean isHidden,
++            boolean noRenderer,
++            @Nullable String partitionName) {
+         return WebContentsStateJni.get()
+-                .restoreContentsFromByteBuffer(profile, buffer(), version(), isHidden, noRenderer);
++                .restoreContentsFromByteBuffer(
++                        profile,
++                        buffer(),
++                        version(),
++                        isHidden,
++                        noRenderer,
++                        partitionName == null ? "" : partitionName);
+     }
+ 
+     /**
+@@ -387,7 +407,8 @@ public class WebContentsState {
+                 ByteBuffer buffer,
+                 int savedStateVersion,
+                 boolean initiallyHidden,
+-                boolean noRenderer);
++                boolean noRenderer,
++                @JniType("std::string") String partitionName);
+ 
+         @Nullable ByteBuffer getContentsStateAsByteBuffer(WebContents webcontents);
+ 
+--- a/chrome/browser/tab/web_contents_state.cc
++++ b/chrome/browser/tab/web_contents_state.cc
+@@ -31,10 +31,14 @@
+ #include "content/public/browser/navigation_controller.h"
+ #include "content/public/browser/navigation_entry.h"
+ #include "content/public/browser/restore_type.h"
++#include "content/public/browser/site_instance.h"
++#include "content/public/browser/storage_partition_config.h"
+ #include "content/public/browser/web_contents.h"
+ #include "content/public/common/referrer.h"
+ #include "services/network/public/cpp/shared_url_loader_factory.h"
+ #include "third_party/jni_zero/common_apis.h"
++#include "url/gurl.h"
++#include "url/url_constants.h"
+ 
+ // Must come after all headers that specialize FromJniType() / ToJniType().
+ #include "chrome/browser/tab/jni_headers/WebContentsState_jni.h"
+@@ -261,14 +265,15 @@ ScopedJavaLocalRef<jobject> WebContentsS
+     BrowserContext* browser_context,
+     int saved_state_version,
+     bool initially_hidden,
+-    bool no_renderer) {
++    bool no_renderer,
++    const std::string& partition_name) {
+   base::span<const uint8_t> span =
+       base::android::JavaByteBufferToSpan(env, state);
+ 
+   WebContents* web_contents =
+       WebContentsState::RestoreContentsFromByteBufferImpl(
+           browser_context, span, saved_state_version, initially_hidden,
+-          no_renderer)
++          no_renderer, partition_name)
+           .release();
+ 
+   if (web_contents) {
+@@ -294,7 +299,8 @@ WebContentsState::RestoreContentsFromByt
+     base::span<const uint8_t> buffer,
+     int saved_state_version,
+     bool initially_hidden,
+-    bool no_renderer) {
++    bool no_renderer,
++    const std::string& partition_name) {
+   bool is_off_the_record = browser_context->IsOffTheRecord();
+   int current_entry_index;
+   std::vector<sessions::SerializedNavigationEntry> navigations;
+@@ -309,7 +315,19 @@ WebContentsState::RestoreContentsFromByt
+       sessions::ContentSerializedNavigationBuilder::ToNavigationEntries(
+           navigations, browser_context);
+ 
+-  WebContents::CreateParams params(browser_context);
++  // A tab in a workspace with separate storage comes back in that workspace's
++  // partition; WebContentsFactory creates it there in the first place, under
++  // the same domain.
++  WebContents::CreateParams params =
++      partition_name.empty()
++          ? WebContents::CreateParams(browser_context)
++          : WebContents::CreateParams(
++                browser_context,
++                content::SiteInstance::CreateForFixedStoragePartition(
++                    browser_context, GURL(url::kAboutBlankURL),
++                    content::StoragePartitionConfig::Create(
++                        browser_context, /*partition_domain=*/"workspace",
++                        partition_name, /*in_memory=*/false)));
+ 
+   params.initially_hidden = initially_hidden;
+   if (no_renderer) {
+@@ -525,9 +543,11 @@ JNI_WebContentsState_RestoreContentsFrom
+     const JavaRef<jobject>& state,
+     int saved_state_version,
+     bool initially_hidden,
+-    bool no_renderer) {
++    bool no_renderer,
++    const std::string& partition_name) {
+   return WebContentsState::RestoreContentsFromByteBuffer(
+-      env, state, profile, saved_state_version, initially_hidden, no_renderer);
++      env, state, profile, saved_state_version, initially_hidden, no_renderer,
++      partition_name);
+ }
+ 
+ static ScopedJavaLocalRef<jobject>
+--- a/chrome/browser/tab/web_contents_state.h
++++ b/chrome/browser/tab/web_contents_state.h
+@@ -82,13 +82,15 @@ class WebContentsState {
+ 
+ 
+   // Restores a WebContents from the passed in state using JNI parameters.
++  // A non-empty `partition_name` rebuilds it in that workspace partition.
+   static base::android::ScopedJavaLocalRef<jobject>
+   RestoreContentsFromByteBuffer(JNIEnv* env,
+                                 const base::android::JavaRef<jobject>& state,
+                                 content::BrowserContext* browser_context,
+                                 int saved_state_version,
+                                 bool initially_hidden,
+-                                bool no_renderer);
++                                bool no_renderer,
++                                const std::string& partition_name);
+ 
+   // Restores a WebContents from the passed in state using native parameters.
+   static std::unique_ptr<content::WebContents> RestoreContentsFromByteBuffer(
+@@ -150,11 +152,13 @@ class WebContentsState {
+ 
+  private:
+   static std::unique_ptr<content::WebContents>
+-  RestoreContentsFromByteBufferImpl(content::BrowserContext* browser_context,
+-                                    base::span<const uint8_t> buffer,
+-                                    int saved_state_version,
+-                                    bool initially_hidden,
+-                                    bool no_renderer);
++  RestoreContentsFromByteBufferImpl(
++      content::BrowserContext* browser_context,
++      base::span<const uint8_t> buffer,
++      int saved_state_version,
++      bool initially_hidden,
++      bool no_renderer,
++      const std::string& partition_name = std::string());
+ };
+ 
+ #endif  // CHROME_BROWSER_TAB_WEB_CONTENTS_STATE_H_
+--- a/chrome/browser/ui/vertical_tabs/BUILD.gn
++++ b/chrome/browser/ui/vertical_tabs/BUILD.gn
+@@ -3,16 +3,29 @@
+ # found in the LICENSE file.
+ 
+ import("//build/config/android/rules.gni")
++import("//third_party/jni_zero/jni_zero.gni")
+ 
+ android_library("java") {
+-  sources = [ "android/java/src/org/chromium/chrome/browser/ui/vertical_tabs/VerticalTabUtils.java" ]
++  srcjar_deps = [ ":jni_headers" ]
++  sources = [
++    "android/java/src/org/chromium/chrome/browser/ui/vertical_tabs/VerticalTabUtils.java",
++    "android/java/src/org/chromium/chrome/browser/ui/vertical_tabs/Workspaces.java",
++  ]
+ 
+   deps = [
++    "//base:base_java",
+     "//base:metrics_java",
+     "//build/android:build_java",
+     "//chrome/browser/flags:java",
+     "//chrome/browser/preferences:java",
+     "//third_party/androidx:androidx_annotation_annotation_java",
++    "//third_party/jni_zero:jni_zero_java",
+     "//ui/android:ui_no_recycler_view_java",
+   ]
+ }
++
++generate_jni("jni_headers") {
++  sources = [
++    "android/java/src/org/chromium/chrome/browser/ui/vertical_tabs/Workspaces.java",
++  ]
++}
+--- /dev/null
++++ b/chrome/browser/ui/vertical_tabs/android/java/src/org/chromium/chrome/browser/ui/vertical_tabs/Workspaces.java
+@@ -0,0 +1,432 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++package org.chromium.chrome.browser.ui.vertical_tabs;
++
++import org.jni_zero.CalledByNative;
++import org.jni_zero.JniType;
++import org.json.JSONArray;
++import org.json.JSONException;
++import org.json.JSONObject;
++
++import org.chromium.base.ObserverList;
++import org.chromium.build.annotations.NullMarked;
++import org.chromium.build.annotations.Nullable;
++import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
++import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
++
++import java.util.ArrayList;
++import java.util.Collection;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++import java.util.UUID;
++
++/**
++ * Workspaces: sets of tabs shown to the exclusion of the others, one of them current at a time.
++ * Switching workspace changes which tabs the strip and the rail show.
++ *
++ * <p>A workspace is not a tab group. Membership is a side table keyed on the tab id -- stable for
++ * the life of the tab and across restarts -- so a tab can sit in a workspace, a group and a stack
++ * at once, the way Vivaldi keeps its workspace id apart from Chromium's grouping.
++ *
++ * <p>A workspace can keep its own storage: tabs created in it then get a storage partition of
++ * their own, so cookies, logins and site data do not cross between workspaces. A partition is
++ * fixed when a tab's WebContents is created, so switching the setting rebuilds the pages already
++ * open in the workspace (see TabImpl#moveToWorkspaceStorage).
++ *
++ * <p>Only the regular tabs of the tabbed browser take part; incognito and custom tabs never do.
++ */
++@NullMarked
++public final class Workspaces {
++    /**
++     * The workspace every tab starts in. It always exists, and uses the profile's own storage
++     * unless isolated like any other.
++     */
++    public static final String DEFAULT_ID = "default";
++
++    /**
++     * A workspace with no colour of its own. The others take one of the browser's theme colours,
++     * the new tab page's Chrome colors, by its NtpThemeColorId.
++     */
++    public static final int NO_COLOR = -1;
++
++    /** One workspace's durable record. */
++    public static final class Workspace {
++        public final String id;
++        public String name;
++        // A Chrome color's NtpThemeColorId, or NO_COLOR.
++        public int color;
++        public boolean separateStorage;
++        // The tab last selected here, so switching back lands where the user left off.
++        public int lastTabId;
++
++        Workspace(String id, String name, int color, boolean separateStorage, int lastTabId) {
++            this.id = id;
++            this.name = name;
++            this.color = color;
++            this.separateStorage = separateStorage;
++            this.lastTabId = lastTabId;
++        }
++    }
++
++    // The desktop build's word for them; new ones are "Space 2", "Space 3" and so on.
++    private static final String DEFAULT_NAME = "Space";
++    // What earlier builds named them; names they generated are renamed on load.
++    private static final String OLD_DEFAULT_NAME = "Workspace";
++    private static final int INVALID_TAB_ID = -1;
++    // By TabGroupColorId: grey has no Chrome color; blue, red, yellow, green, pink, purple, cyan
++    // and orange become Blue, Rose, Citron, Green, Fuchsia, Violet, Aqua and Orange.
++    private static final int[] TAB_GROUP_COLOR_TO_THEME_COLOR = {NO_COLOR, 1, 7, 5, 3, 8, 9, 2, 6};
++
++    private static final ObserverList<Runnable> sObservers = new ObserverList<>();
++    private static @Nullable List<Workspace> sWorkspaces;
++    private static @Nullable Map<Integer, String> sTabToWorkspace;
++    private static @Nullable String sActiveId;
++
++    private Workspaces() {}
++
++    /** Whether workspaces are switched on in Settings > Experimental > Tabs. */
++    public static boolean isEnabled() {
++        return ChromeSharedPreferences.getInstance()
++                .readBoolean(ChromePreferenceKeys.WORKSPACES_ENABLED, true);
++    }
++
++    /** Told whenever the set of workspaces, their records, the current one or membership change. */
++    public static void addObserver(Runnable observer) {
++        sObservers.addObserver(observer);
++    }
++
++    public static void removeObserver(Runnable observer) {
++        sObservers.removeObserver(observer);
++    }
++
++    /** All workspaces, in the order they were created. There is always at least one. */
++    public static List<Workspace> getAll() {
++        return new ArrayList<>(workspaces());
++    }
++
++    public static @Nullable Workspace get(String id) {
++        for (Workspace workspace : workspaces()) {
++            if (workspace.id.equals(id)) return workspace;
++        }
++        return null;
++    }
++
++    /** The current workspace's id. */
++    public static String getActiveId() {
++        if (sActiveId == null) {
++            String stored =
++                    ChromeSharedPreferences.getInstance()
++                            .readString(ChromePreferenceKeys.WORKSPACES_ACTIVE, DEFAULT_ID);
++            sActiveId = stored != null && get(stored) != null ? stored : DEFAULT_ID;
++        }
++        return sActiveId;
++    }
++
++    public static Workspace getActive() {
++        Workspace active = get(getActiveId());
++        return active != null ? active : workspaces().get(0);
++    }
++
++    /** Makes {@code id} current. Choosing which tab to show is the caller's business. */
++    public static void setActiveId(String id) {
++        if (get(id) == null || id.equals(getActiveId())) return;
++        sActiveId = id;
++        ChromeSharedPreferences.getInstance().writeString(ChromePreferenceKeys.WORKSPACES_ACTIVE, id);
++        notifyObservers();
++    }
++
++    /** The workspace {@code tabId} belongs to. Tabs never assigned belong to the default one. */
++    public static String getWorkspaceOfTab(int tabId) {
++        String id = tabs().get(tabId);
++        return id != null && get(id) != null ? id : DEFAULT_ID;
++    }
++
++    /** Whether {@code tabId} has been given a workspace, as opposed to defaulting to one. */
++    public static boolean isTabAssigned(int tabId) {
++        return tabs().containsKey(tabId);
++    }
++
++    /** Moves {@code tabId} into workspace {@code id}. */
++    public static void setWorkspaceOfTab(int tabId, String id) {
++        if (get(id) == null || id.equals(tabs().get(tabId))) return;
++        tabs().put(tabId, id);
++        saveTabs();
++        notifyObservers();
++    }
++
++    /** Drops a tab that has been closed for good. */
++    public static void forgetTab(int tabId) {
++        if (tabs().remove(tabId) != null) saveTabs();
++    }
++
++    /** Drops every recorded tab not in {@code liveTabIds}, once the tab model has restored. */
++    public static void retainTabs(Collection<Integer> liveTabIds) {
++        if (tabs().keySet().retainAll(liveTabIds)) saveTabs();
++    }
++
++    /** Whether {@code tabId} belongs to a workspace other than the current one. */
++    public static boolean isTabHidden(int tabId) {
++        if (!isEnabled() || workspaces().size() < 2) return false;
++        return !getWorkspaceOfTab(tabId).equals(getActiveId());
++    }
++
++    /**
++     * Records the workspace of a tab being created and returns the storage partition its page
++     * should live in. A new tab joins its parent's workspace -- a link opened from a tab stays with
++     * it -- and otherwise the current one; a restored tab keeps the workspace it already had.
++     *
++     * @return The partition name, or null for the profile's own storage.
++     */
++    public static @Nullable String onTabCreated(int tabId, int parentId, boolean isRestore) {
++        if (!isEnabled()) return null;
++        if (!isRestore && !isTabAssigned(tabId)) {
++            String workspace =
++                    parentId != INVALID_TAB_ID && isTabAssigned(parentId)
++                            ? getWorkspaceOfTab(parentId)
++                            : getActiveId();
++            tabs().put(tabId, workspace);
++            saveTabs();
++        }
++        return getPartitionForTab(tabId);
++    }
++
++    /** The storage partition {@code tabId}'s page lives in, or null for the profile's own. */
++    public static @Nullable String getPartitionForTab(int tabId) {
++        if (!isEnabled()) return null;
++        Workspace workspace = get(getWorkspaceOfTab(tabId));
++        return workspace != null && workspace.separateStorage ? workspace.id : null;
++    }
++
++    /**
++     * The storage partitions browsing data is also cleared from. Every workspace may have one,
++     * named after it: what a workspace stored while isolated stays there after that is turned off.
++     */
++    @CalledByNative
++    private static @JniType("std::vector<std::string>") List<String> getStoragePartitions() {
++        List<String> partitions = new ArrayList<>();
++        for (Workspace workspace : workspaces()) partitions.add(workspace.id);
++        return partitions;
++    }
++
++    /** Creates a workspace with separate storage, as new workspaces have by default. */
++    public static Workspace create(@Nullable String name) {
++        String title = name == null || name.trim().isEmpty() ? nextDefaultName() : name.trim();
++        Workspace workspace =
++                new Workspace(
++                        UUID.randomUUID().toString(),
++                        title,
++                        NO_COLOR,
++                        /* separateStorage= */ true,
++                        INVALID_TAB_ID);
++        workspaces().add(workspace);
++        saveWorkspaces();
++        notifyObservers();
++        return workspace;
++    }
++
++    public static void rename(String id, String name) {
++        Workspace workspace = get(id);
++        if (workspace == null || name.trim().isEmpty()) return;
++        workspace.name = name.trim();
++        saveWorkspaces();
++        notifyObservers();
++    }
++
++    public static void setColor(String id, int color) {
++        Workspace workspace = get(id);
++        if (workspace == null || workspace.color == color) return;
++        workspace.color = color;
++        saveWorkspaces();
++        notifyObservers();
++    }
++
++    public static void setSeparateStorage(String id, boolean separate) {
++        Workspace workspace = get(id);
++        if (workspace == null || workspace.separateStorage == separate) return;
++        workspace.separateStorage = separate;
++        saveWorkspaces();
++        notifyObservers();
++    }
++
++    /** Remembers the tab last selected in {@code tabId}'s workspace. */
++    public static void noteSelectedTab(int tabId) {
++        Workspace workspace = get(getWorkspaceOfTab(tabId));
++        if (workspace == null || workspace.lastTabId == tabId) return;
++        workspace.lastTabId = tabId;
++        saveWorkspaces();
++    }
++
++    /**
++     * Deletes workspace {@code id}; the caller closes its tabs. The default workspace cannot be
++     * deleted, and neither can the last one standing.
++     */
++    public static boolean delete(String id) {
++        if (DEFAULT_ID.equals(id) || workspaces().size() < 2) return false;
++        Workspace workspace = get(id);
++        if (workspace == null) return false;
++        workspaces().remove(workspace);
++        tabs().values().removeIf(id::equals);
++        if (id.equals(getActiveId())) {
++            sActiveId = DEFAULT_ID;
++            ChromeSharedPreferences.getInstance()
++                    .writeString(ChromePreferenceKeys.WORKSPACES_ACTIVE, DEFAULT_ID);
++        }
++        saveWorkspaces();
++        saveTabs();
++        notifyObservers();
++        return true;
++    }
++
++    /** The ids of {@code workspaceId}'s tabs among {@code tabIds}, in the order given. */
++    public static List<Integer> filterTabs(List<Integer> tabIds, String workspaceId) {
++        List<Integer> result = new ArrayList<>();
++        for (int tabId : tabIds) {
++            if (getWorkspaceOfTab(tabId).equals(workspaceId)) result.add(tabId);
++        }
++        return result;
++    }
++
++    private static String nextDefaultName() {
++        int suffix = workspaces().size() + 1;
++        while (true) {
++            String candidate = DEFAULT_NAME + " " + suffix;
++            boolean taken = false;
++            for (Workspace workspace : workspaces()) {
++                if (workspace.name.equals(candidate)) taken = true;
++            }
++            if (!taken) return candidate;
++            suffix++;
++        }
++    }
++
++    private static void notifyObservers() {
++        for (Runnable observer : sObservers) observer.run();
++    }
++
++    private static List<Workspace> workspaces() {
++        if (sWorkspaces == null) {
++            sWorkspaces = loadWorkspaces();
++            boolean hasDefault = false;
++            for (Workspace workspace : sWorkspaces) {
++                if (DEFAULT_ID.equals(workspace.id)) hasDefault = true;
++            }
++            if (!hasDefault) {
++                sWorkspaces.add(
++                        0,
++                        new Workspace(
++                                DEFAULT_ID,
++                                DEFAULT_NAME,
++                                NO_COLOR,
++                                /* separateStorage= */ false,
++                                INVALID_TAB_ID));
++            }
++        }
++        return sWorkspaces;
++    }
++
++    private static Map<Integer, String> tabs() {
++        if (sTabToWorkspace == null) sTabToWorkspace = loadTabs();
++        return sTabToWorkspace;
++    }
++
++    private static List<Workspace> loadWorkspaces() {
++        List<Workspace> result = new ArrayList<>();
++        String json =
++                ChromeSharedPreferences.getInstance()
++                        .readString(ChromePreferenceKeys.WORKSPACES_LIST, null);
++        if (json == null) return result;
++        try {
++            JSONArray array = new JSONArray(json);
++            for (int i = 0; i < array.length(); i++) {
++                JSONObject item = array.getJSONObject(i);
++                result.add(
++                        new Workspace(
++                                item.getString("id"),
++                                renameOldDefaultName(item.optString("name", DEFAULT_NAME)),
++                                readColor(item),
++                                item.optBoolean("storage", false),
++                                item.optInt("lastTab", INVALID_TAB_ID)));
++            }
++        } catch (JSONException e) {
++            result.clear();
++        }
++        return result;
++    }
++
++    /**
++     * A workspace's Chrome color. Earlier builds stored a tab group colour under "color" instead;
++     * it becomes the Chrome color nearest to it.
++     */
++    private static int readColor(JSONObject item) {
++        if (item.has("theme")) return item.optInt("theme", NO_COLOR);
++        int oldColor = item.optInt("color", NO_COLOR);
++        return oldColor >= 0 && oldColor < TAB_GROUP_COLOR_TO_THEME_COLOR.length
++                ? TAB_GROUP_COLOR_TO_THEME_COLOR[oldColor]
++                : NO_COLOR;
++    }
++
++    /** "Workspace" and "Workspace 2", as earlier builds named them, become "Space", "Space 2". */
++    private static String renameOldDefaultName(String name) {
++        if (name.equals(OLD_DEFAULT_NAME)) return DEFAULT_NAME;
++        String prefix = OLD_DEFAULT_NAME + " ";
++        if (name.startsWith(prefix) && name.substring(prefix.length()).matches("[0-9]+")) {
++            return DEFAULT_NAME + " " + name.substring(prefix.length());
++        }
++        return name;
++    }
++
++    private static void saveWorkspaces() {
++        JSONArray array = new JSONArray();
++        try {
++            for (Workspace workspace : workspaces()) {
++                JSONObject item = new JSONObject();
++                item.put("id", workspace.id);
++                item.put("name", workspace.name);
++                item.put("theme", workspace.color);
++                item.put("storage", workspace.separateStorage);
++                item.put("lastTab", workspace.lastTabId);
++                array.put(item);
++            }
++        } catch (JSONException e) {
++            return;
++        }
++        ChromeSharedPreferences.getInstance()
++                .writeString(ChromePreferenceKeys.WORKSPACES_LIST, array.toString());
++    }
++
++    private static Map<Integer, String> loadTabs() {
++        Map<Integer, String> result = new HashMap<>();
++        String json =
++                ChromeSharedPreferences.getInstance()
++                        .readString(ChromePreferenceKeys.WORKSPACES_TABS, null);
++        if (json == null) return result;
++        try {
++            JSONObject object = new JSONObject(json);
++            JSONArray names = object.names();
++            if (names == null) return result;
++            for (int i = 0; i < names.length(); i++) {
++                String key = names.getString(i);
++                result.put(Integer.parseInt(key), object.getString(key));
++            }
++        } catch (JSONException | NumberFormatException e) {
++            result.clear();
++        }
++        return result;
++    }
++
++    private static void saveTabs() {
++        JSONObject object = new JSONObject();
++        try {
++            for (Map.Entry<Integer, String> entry : tabs().entrySet()) {
++                object.put(String.valueOf(entry.getKey()), entry.getValue());
++            }
++        } catch (JSONException e) {
++            return;
++        }
++        ChromeSharedPreferences.getInstance()
++                .writeString(ChromePreferenceKeys.WORKSPACES_TABS, object.toString());
++    }
++}
+--- a/components/permissions/permission_util.cc
++++ b/components/permissions/permission_util.cc
+@@ -28,6 +28,8 @@
+ #include "content/public/browser/permission_result.h"
+ #include "content/public/browser/render_frame_host.h"
+ #include "content/public/browser/render_process_host.h"
++#include "content/public/browser/storage_partition.h"
++#include "content/public/browser/storage_partition_config.h"
+ #include "content/public/browser/web_contents.h"
+ #include "content/public/common/content_features.h"
+ #include "services/network/public/mojom/permissions_policy/permissions_policy_feature.mojom.h"
+@@ -657,6 +659,15 @@ bool PermissionUtil::IsPermissionBlocked
+     const GURL& requesting_origin,
+     content::RenderProcessHost* render_process_host) {
+   DCHECK(render_process_host);
++  // An isolated workspace keeps its sites in a StoragePartition of its own
++  // (see chrome/browser/android/content/web_contents_factory.cc), while their
++  // permissions stay the profile's; don't block them there, as Brave does not
++  // for its containers.
++  if (render_process_host->GetStoragePartition()
++          ->GetConfig()
++          .partition_domain() == "workspace") {
++    return false;
++  }
+   switch (GetPermissionDelegationMode(permission)) {
+     case PermissionDelegationMode::kDelegated:
+       return false;
+--- a/content/browser/browsing_instance.cc
++++ b/content/browser/browsing_instance.cc
+@@ -79,8 +79,14 @@ scoped_refptr<SiteInstanceImpl> Browsing
+   // Some URLs should leave the SiteInstance's site unassigned, though if
+   // `instance` is for a guest, we should always set the site to ensure that it
+   // carries guest information contained within SiteInfo.
++  //
++  // The same holds for any fixed StoragePartition, such as a browser tab kept
++  // in its own workspace partition: an unassigned SiteInstance reports the
++  // default partition, so a navigation from one -- to a chrome-native:// or
++  // about:blank page, say -- would carry the default partition into a
++  // BrowsingInstance pinned to another, and fail the partition checks.
+   if (SiteInstanceImpl::ShouldAssignSiteForUrlInfo(url_info) ||
+-      isolation_context_.is_guest()) {
++      isolation_context_.is_guest() || is_fixed_storage_partition_) {
+     if (base::FeatureList::IsEnabled(features::kPrecomputeSiteInfo)) {
+       instance->SetSiteInfoAndOriginalUrl(site_info, url_info.url);
+     } else {
+--- a/content/browser/web_contents/web_contents_impl.cc
++++ b/content/browser/web_contents/web_contents_impl.cc
+@@ -5560,6 +5560,11 @@ FrameTree* WebContentsImpl::CreateNewWin
+       // as long as they preserve the guest's StoragePartition.
+       site_instance =
+           SiteInstance::CreateForGuest(GetBrowserContext(), partition_config);
++    } else if (!partition_config.is_default()) {
++      // Likewise a page in a fixed StoragePartition (an isolated workspace)
++      // keeps it for noopener windows, or target=_blank links would leave it.
++      site_instance = SiteInstance::CreateForFixedStoragePartition(
++          GetBrowserContext(), GURL(url::kAboutBlankURL), partition_config);
+     } else {
+       site_instance = SiteInstance::Create(GetBrowserContext());
+     }
