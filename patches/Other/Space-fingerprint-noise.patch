@@ -1,0 +1,370 @@
+--- a/components/ungoogled/ungoogled_switches.cc
++++ b/components/ungoogled/ungoogled_switches.cc
+@@ -15,4 +15,8 @@ const char kFingerprintingCanvasMeasureT
+ // Enable fingerprinting deception for Canvas image data
+ const char kFingerprintingCanvasImageDataNoise[] = "fingerprinting-canvas-image-data-noise";
+ 
++// The key a renderer derives its fingerprinting noise from (hex); set by the
++// browser per run and storage partition, not a user flag.
++const char kFingerprintingNoiseKey[] = "fingerprinting-noise-key";
++
+ }  // namespace switches
+--- a/components/ungoogled/ungoogled_switches.h
++++ b/components/ungoogled/ungoogled_switches.h
+@@ -14,6 +14,7 @@ namespace switches {
+ COMPONENT_EXPORT(UNGOOGLED) extern const char kFingerprintingClientRectsNoise[];
+ COMPONENT_EXPORT(UNGOOGLED) extern const char kFingerprintingCanvasMeasureTextNoise[];
+ COMPONENT_EXPORT(UNGOOGLED) extern const char kFingerprintingCanvasImageDataNoise[];
++COMPONENT_EXPORT(UNGOOGLED) extern const char kFingerprintingNoiseKey[];
+ 
+ }
+ 
+--- a/content/browser/renderer_host/render_process_host_impl.cc
++++ b/content/browser/renderer_host/render_process_host_impl.cc
+@@ -172,6 +172,7 @@
+ #include "content/public/common/result_codes.h"
+ #include "content/public/common/url_constants.h"
+ #include "content/public/common/zygote/zygote_buildflags.h"
++#include "crypto/hmac.h"
+ #include "google_apis/gaia/gaia_config.h"
+ #include "google_apis/gaia/gaia_switches.h"
+ #include "gpu/command_buffer/client/gpu_switches.h"
+@@ -329,6 +330,17 @@ bool g_run_renderer_in_process = false;
+ 
+ RendererMainThreadFactoryFunction g_renderer_main_thread_factory = nullptr;
+ 
++// Random per browser run; the root of every renderer's fingerprinting noise
++// key, see AppendRendererCommandLine().
++base::span<const uint8_t> FingerprintingNoiseSessionKey() {
++  static const std::array<uint8_t, 32> key = [] {
++    std::array<uint8_t, 32> bytes;
++    base::RandBytes(bytes);
++    return bytes;
++  }();
++  return key;
++}
++
+ base::Thread* g_in_process_thread = nullptr;
+ 
+ RenderProcessHostFactory* g_render_process_host_factory_ = nullptr;
+@@ -3773,6 +3785,25 @@ void RenderProcessHostImpl::AppendRender
+       *base::CommandLine::ForCurrentProcess();
+   PropagateBrowserCommandLineToRenderer(browser_command_line, command_line);
+ 
++  // The fingerprinting noise key: random per browser run and different for
++  // every storage partition, so the noise a site sees stays the same until the
++  // browser restarts but differs between sites and between isolated workspaces
++  // (Brave's "farbling", salted per container). Isolated partitions get the
++  // noise whether or not its flags are on.
++  const StoragePartitionConfig& partition_config =
++      GetStoragePartition()->GetConfig();
++  const std::string partition_id = partition_config.partition_domain() + "/" +
++                                   partition_config.partition_name();
++  command_line->AppendSwitchASCII(
++      switches::kFingerprintingNoiseKey,
++      base::HexEncode(crypto::hmac::SignSha256(
++          FingerprintingNoiseSessionKey(), base::as_byte_span(partition_id))));
++  if (!partition_config.is_default()) {
++    command_line->AppendSwitch(switches::kFingerprintingClientRectsNoise);
++    command_line->AppendSwitch(switches::kFingerprintingCanvasMeasureTextNoise);
++    command_line->AppendSwitch(switches::kFingerprintingCanvasImageDataNoise);
++  }
++
+   // Pass on the browser locale.
+   const std::string locale =
+       GetContentClient()->browser()->GetApplicationLocale();
+--- a/third_party/blink/renderer/core/dom/document.cc
++++ b/third_party/blink/renderer/core/dom/document.cc
+@@ -383,6 +383,7 @@
+ #include "third_party/blink/renderer/platform/bindings/source_location.h"
+ #include "third_party/blink/renderer/platform/bindings/v8_dom_wrapper.h"
+ #include "third_party/blink/renderer/platform/bindings/v8_per_isolate_data.h"
++#include "third_party/blink/renderer/platform/fingerprinting_noise.h"
+ #include "third_party/blink/renderer/platform/fonts/font_performance.h"
+ #include "third_party/blink/renderer/platform/geometry/length_functions.h"
+ #include "third_party/blink/renderer/platform/graphics/dom_node_id.h"
+@@ -1053,9 +1054,14 @@ Document::Document(const DocumentInit& i
+   TRACE_EVENT("blink", "Document::Document", perfetto::Flow::FromPointer(this));
+   DCHECK(agent_);
+   if (RuntimeEnabledFeatures::FingerprintingClientRectsNoiseEnabled()) {
++    // Seeded by the top-level site: its window's storage key is set before the
++    // document is created.
++    FingerprintingNoise::ScopedSeed seed(
++        dom_window_ ? dom_window_->GetStorageKey().GetTopLevelSite().Serialize()
++                    : String());
+     // Precompute -0.0003% to 0.0003% noise factor for get*ClientRect*() fingerprinting
+-    noise_factor_x_ = 1 + (base::RandDouble() - 0.5) * 0.000003;
+-    noise_factor_y_ = 1 + (base::RandDouble() - 0.5) * 0.000003;
++    noise_factor_x_ = 1 + (FingerprintingNoise::RandDouble() - 0.5) * 0.000003;
++    noise_factor_y_ = 1 + (FingerprintingNoise::RandDouble() - 0.5) * 0.000003;
+   }
+   if (base::FeatureList::IsEnabled(features::kDelayAsyncScriptExecution) &&
+       features::kDelayAsyncScriptExecutionDelayByDefaultParam.Get()) {
+--- a/third_party/blink/renderer/core/html/canvas/html_canvas_element.cc
++++ b/third_party/blink/renderer/core/html/canvas/html_canvas_element.cc
+@@ -106,6 +106,7 @@
+ #include "third_party/blink/renderer/core/probe/core_probes.h"
+ #include "third_party/blink/renderer/core/resize_observer/resize_observer_utilities.h"
+ #include "third_party/blink/renderer/platform/bindings/exception_state.h"
++#include "third_party/blink/renderer/platform/fingerprinting_noise.h"
+ #include "third_party/blink/renderer/platform/fonts/plain_text_painter.h"
+ #include "third_party/blink/renderer/platform/graphics/canvas_resource.h"
+ #include "third_party/blink/renderer/platform/graphics/canvas_resource_dispatcher.h"
+@@ -1292,6 +1293,11 @@ String HTMLCanvasElement::ToDataURLInter
+     if (!data_buffer)
+       return String("data:,");
+ 
++    // The encoder adds the canvas noise; seed it by the top-level site.
++    LocalDOMWindow* window = GetDocument().domWindow();
++    FingerprintingNoise::ScopedSeed seed(
++        window ? window->GetStorageKey().GetTopLevelSite().Serialize()
++               : String());
+     String data_url = data_buffer->ToDataURL(encoding_mime_type, quality);
+     base::TimeDelta elapsed_time = base::TimeTicks::Now() - start_time;
+     float sqrt_pixels =
+--- a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
++++ b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
+@@ -68,6 +68,7 @@
+ #include "third_party/blink/renderer/modules/webgpu/gpu_device.h"
+ #include "third_party/blink/renderer/modules/webgpu/gpu_texture.h"
+ #include "third_party/blink/renderer/platform/bindings/exception_code.h"
++#include "third_party/blink/renderer/platform/fingerprinting_noise.h"
+ #include "third_party/blink/renderer/platform/fonts/font.h"
+ #include "third_party/blink/renderer/platform/fonts/font_selection_types.h"
+ #include "third_party/blink/renderer/platform/fonts/font_selector.h"
+@@ -119,6 +120,14 @@ class MemoryManagedPaintCanvas;
+ 
+ namespace {
+ 
++// The site the canvas noise is seeded by: the top-level site for a window,
++// the worker's own origin otherwise.
++String FingerprintingNoiseSite(ExecutionContext* context) {
++  if (auto* window = DynamicTo<LocalDOMWindow>(context)) {
++    return window->GetStorageKey().GetTopLevelSite().Serialize();
++  }
++  return context ? context->GetSecurityOrigin()->ToString() : String();
++}
+ 
+ bool IsContextProviderValid() {
+   base::WeakPtr<WebGraphicsContext3DProviderWrapper> context_provider_wrapper =
+@@ -518,6 +527,8 @@ ImageData* BaseRenderingContext2D::getIm
+       DCHECK(!bounds.intersect(SkIRect::MakeXYWH(sx, sy, sw, sh)));
+     }
+     if (read_pixels_successful && RuntimeEnabledFeatures::FingerprintingCanvasImageDataNoiseEnabled()) {
++      FingerprintingNoise::ScopedSeed seed(
++          FingerprintingNoiseSite(GetTopExecutionContext()));
+       StaticBitmapImage::ShuffleSubchannelColorData(image_data_pixmap.addr(), image_data_pixmap.info(), sx, sy);
+     }
+   }
+--- a/third_party/blink/renderer/platform/BUILD.gn
++++ b/third_party/blink/renderer/platform/BUILD.gn
+@@ -650,6 +650,8 @@ component("platform") {
+     "feature_context.h",
+     "file_metadata.cc",
+     "file_metadata.h",
++    "fingerprinting_noise.cc",
++    "fingerprinting_noise.h",
+     "fonts/alternate_font_family.h",
+     "fonts/bitmap_glyphs_block_list.cc",
+     "fonts/bitmap_glyphs_block_list.h",
+--- /dev/null
++++ b/third_party/blink/renderer/platform/fingerprinting_noise.cc
+@@ -0,0 +1,103 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "third_party/blink/renderer/platform/fingerprinting_noise.h"
++
++#include <bit>
++#include <optional>
++#include <string>
++#include <vector>
++
++#include "base/command_line.h"
++#include "base/containers/span.h"
++#include "base/no_destructor.h"
++#include "base/numerics/byte_conversions.h"
++#include "base/rand_util.h"
++#include "base/strings/string_number_conversions.h"
++#include "components/ungoogled/ungoogled_switches.h"
++#include "crypto/hmac.h"
++
++namespace blink {
++
++namespace {
++
++constinit thread_local FingerprintingNoise::ScopedSeed* g_current_seed =
++    nullptr;
++
++// The key the browser passed, or nullopt when it passed none.
++const std::optional<std::vector<uint8_t>>& Key() {
++  static const base::NoDestructor<std::optional<std::vector<uint8_t>>> key(
++      []() -> std::optional<std::vector<uint8_t>> {
++        std::vector<uint8_t> bytes;
++        if (!base::HexStringToBytes(
++                base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
++                    switches::kFingerprintingNoiseKey),
++                &bytes) ||
++            bytes.empty()) {
++          return std::nullopt;
++        }
++        return bytes;
++      }());
++  return *key;
++}
++
++}  // namespace
++
++FingerprintingNoise::ScopedSeed::ScopedSeed(const String& site) {
++  const std::optional<std::vector<uint8_t>>& key = Key();
++  if (!key) {
++    return;
++  }
++  const std::string site_utf8 = site.Utf8();
++  const auto seed =
++      crypto::hmac::SignSha256(*key, base::as_byte_span(site_utf8));
++  auto words = base::span(seed);
++  for (size_t i = 0; i < state_.size(); ++i) {
++    state_[i] = base::U64FromLittleEndian(words.subspan(i * 8).first<8>());
++  }
++  if (state_ == std::array<uint64_t, 4>{}) {
++    state_[0] = 1;  // An all-zero state would only ever yield zeros.
++  }
++  active_ = true;
++  previous_ = g_current_seed;
++  g_current_seed = this;
++}
++
++FingerprintingNoise::ScopedSeed::~ScopedSeed() {
++  if (active_) {
++    g_current_seed = previous_;
++  }
++}
++
++// xoshiro256**
++uint64_t FingerprintingNoise::ScopedSeed::Next() {
++  const uint64_t result = std::rotl(state_[1] * 5, 7) * 9;
++  const uint64_t t = state_[1] << 17;
++  state_[2] ^= state_[0];
++  state_[3] ^= state_[1];
++  state_[1] ^= state_[2];
++  state_[0] ^= state_[3];
++  state_[2] ^= t;
++  state_[3] = std::rotl(state_[3], 45);
++  return result;
++}
++
++// static
++double FingerprintingNoise::RandDouble() {
++  if (!g_current_seed) {
++    return base::RandDouble();
++  }
++  return (g_current_seed->Next() >> 11) * 0x1.0p-53;
++}
++
++// static
++int FingerprintingNoise::RandIntInclusive(int min, int max) {
++  if (!g_current_seed) {
++    return base::RandIntInclusive(min, max);
++  }
++  const uint64_t range = static_cast<uint64_t>(max - min) + 1;
++  return min + static_cast<int>(g_current_seed->Next() % range);
++}
++
++}  // namespace blink
+--- /dev/null
++++ b/third_party/blink/renderer/platform/fingerprinting_noise.h
+@@ -0,0 +1,55 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef THIRD_PARTY_BLINK_RENDERER_PLATFORM_FINGERPRINTING_NOISE_H_
++#define THIRD_PARTY_BLINK_RENDERER_PLATFORM_FINGERPRINTING_NOISE_H_
++
++#include <array>
++#include <cstdint>
++
++#include "third_party/blink/renderer/platform/platform_export.h"
++#include "third_party/blink/renderer/platform/wtf/allocator/allocator.h"
++#include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
++
++namespace blink {
++
++// Where the fingerprinting noise (canvas image data, client rects,
++// measureText) draws its randomness. The browser gives every renderer a key
++// that is random per browser run and different for each storage partition.
++// Inside a ScopedSeed the noise comes from that key and a site, so the site
++// sees the same noise until the browser restarts while other sites and other
++// isolated workspaces see different noise -- Brave's "farbling", salted per
++// container. Outside a scope, or without a key, it stays random.
++class PLATFORM_EXPORT FingerprintingNoise {
++  STATIC_ONLY(FingerprintingNoise);
++
++ public:
++  // Until destroyed, the noise drawn on this thread derives from `site`, a
++  // serialized top-level site.
++  class PLATFORM_EXPORT ScopedSeed {
++    STACK_ALLOCATED();
++
++   public:
++    explicit ScopedSeed(const String& site);
++    ScopedSeed(const ScopedSeed&) = delete;
++    ScopedSeed& operator=(const ScopedSeed&) = delete;
++    ~ScopedSeed();
++
++    uint64_t Next();
++
++   private:
++    bool active_ = false;
++    std::array<uint64_t, 4> state_ = {};
++    ScopedSeed* previous_ = nullptr;
++  };
++
++  // In [0, 1).
++  static double RandDouble();
++  // In [min, max].
++  static int RandIntInclusive(int min, int max);
++};
++
++}  // namespace blink
++
++#endif  // THIRD_PARTY_BLINK_RENDERER_PLATFORM_FINGERPRINTING_NOISE_H_
+--- a/third_party/blink/renderer/platform/graphics/static_bitmap_image.cc
++++ b/third_party/blink/renderer/platform/graphics/static_bitmap_image.cc
+@@ -13,6 +13,7 @@
+ #include "base/logging.h"
+ #include "base/numerics/checked_math.h"
+ #include "gpu/command_buffer/client/gles2_interface.h"
++#include "third_party/blink/renderer/platform/fingerprinting_noise.h"
+ #include "third_party/blink/renderer/platform/graphics/accelerated_static_bitmap_image.h"
+ #include "third_party/blink/renderer/platform/graphics/graphics_context.h"
+ #include "third_party/blink/renderer/platform/graphics/image_observer.h"
+@@ -138,7 +139,7 @@ void StaticBitmapImage::ShuffleSubchanne
+   }
+ 
+   // generate the first random number here
+-  double shuffleX = base::RandDouble();
++  double shuffleX = FingerprintingNoise::RandDouble();
+ 
+   // cap maximum pixels to change
+   auto pixels = (w + h) / 128;
+@@ -154,7 +155,7 @@ void StaticBitmapImage::ShuffleSubchanne
+   DLOG(INFO) << "BRM: ShuffleSubchannelColorData() w=" << w << " h=" << h << " colorType=" << colorType << " fRowBytes=" << fRowBytes;
+ 
+   // second random number (for y/height)
+-  double shuffleY = base::RandDouble();
++  double shuffleY = FingerprintingNoise::RandDouble();
+ 
+   // calculate random coordinates using bisection
+   auto currentW = w, currentH = h;
+@@ -162,7 +163,7 @@ void StaticBitmapImage::ShuffleSubchanne
+     int x = currentW * shuffleX, y = currentH * shuffleY;
+ 
+     // calculate randomisation amounts for each RGB component
+-    uint8_t shuffleR = base::RandIntInclusive(0, 4);
++    uint8_t shuffleR = FingerprintingNoise::RandIntInclusive(0, 4);
+     uint8_t shuffleG = (shuffleR + x) % 4;
+     uint8_t shuffleB = (shuffleG + y) % 4;
+ 
