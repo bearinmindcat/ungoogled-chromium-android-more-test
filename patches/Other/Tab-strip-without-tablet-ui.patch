@@ -32,6 +32,27 @@
                      setupCompositorContentForTablet();
                  } else {
                      setupCompositorContentForPhone();
+--- a/chrome/browser/ntp_customization/java/src/org/chromium/chrome/browser/ntp_customization/NtpCustomizationUtils.java
++++ b/chrome/browser/ntp_customization/java/src/org/chromium/chrome/browser/ntp_customization/NtpCustomizationUtils.java
+@@ -109,6 +109,7 @@ import org.chromium.components.image_fet
+ import org.chromium.components.image_fetcher.ImageFetcherConfig;
+ import org.chromium.components.image_fetcher.ImageFetcherFactory;
+ import org.chromium.components.search_engines.TemplateUrlService;
++import org.chromium.ui.base.DeviceFormFactor;
+ import org.chromium.ui.base.WindowAndroid;
+ import org.chromium.ui.edge_to_edge.EdgeToEdgeStateProvider;
+ import org.chromium.ui.util.ColorUtils;
+@@ -1165,7 +1166,10 @@ public class NtpCustomizationUtils {
+      */
+     public static boolean supportsEnableEdgeToEdgeOnTop(
+             WindowAndroid windowAndroid, boolean isLff) {
++        // With the tab strip on a phone the top is laid out as on a tablet: the compositor draws
++        // the strip from the window's top, so an NTP drawn into the status bar pushes it there.
+         return !isLff
++                && !DeviceFormFactor.isForceTabletUI()
+                 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                 && NtpCustomizationUtils.isNtpThemeCustomizationEnabled()
+                 && EdgeToEdgeStateProvider.isEdgeToEdgeEnabledForWindow(windowAndroid);
 --- a/ui/android/java/src/org/chromium/ui/base/DeviceFormFactor.java
 +++ b/ui/android/java/src/org/chromium/ui/base/DeviceFormFactor.java
 @@ -87,6 +87,9 @@ public class DeviceFormFactor {
